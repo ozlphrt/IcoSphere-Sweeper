@@ -12,7 +12,7 @@
 
   <style>
 
-    html, body { height: 100%; margin: 0; background: #0b0d12; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    html, body { height: 100%; margin: 0; background: #0a2a1a; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
     #app { position: fixed; inset: 0; }
 
@@ -494,7 +494,7 @@
 
     const app = document.getElementById('app');
 
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b0d12);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a2a1a);
 
     const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.01, 100); camera.position.set(0, 0, 2.8);
 
@@ -571,19 +571,19 @@
 
       immortalMode: true,
 
-      wireHexColor: '#000000',
+      wireHexColor: '#1a2a3a',
 
-      wirePentColor: '#000000',
+      wirePentColor: '#142030',
 
-      hiddenColor: '#19191b',
+      hiddenColor: '#1a2a3a',
 
-      revealedColor: '#13311b',
+      revealedColor: '#3a4a5a',
 
-      flagColor: '#5b2b1c',
+      flagColor: '#8a5a9a',
 
-      mineColor: '#3e0d0d',
+      mineColor: '#4a3a5a',
 
-      mineEmissive: '#300508',
+      mineEmissive: '#202050',
 
       numberOffset: 1.004,
 
@@ -597,7 +597,7 @@
 
       numberScale: 0.8,
 
-      numberColor: '#6f9274',
+      numberColor: '#ccddff',
 
       cameraFOV: 37.49999998013179,
 
@@ -682,6 +682,8 @@
     let revealQueue = [];
 
     let isRevealing = false;
+
+    let isInitialReveal = false;
 
     // Audio setup
 
@@ -1055,6 +1057,8 @@
 
       if (revealQueue.length > 0 && !isRevealing) {
 
+        isInitialReveal = true;
+
         processRevealQueue();
 
       }
@@ -1095,7 +1099,11 @@
 
       updateAdjacentFlags(i);
 
-      playSound('reveal');
+      if (!isInitialReveal) {
+
+        playSound('reveal');
+
+      }
 
       checkWin(); updateCounters();
 
@@ -1133,6 +1141,8 @@
 
           isRevealing = false;
 
+          isInitialReveal = false;
+
           return;
 
         }
@@ -1142,6 +1152,8 @@
         if (idx === undefined){
 
           isRevealing = false;
+
+          isInitialReveal = false;
 
           return;
 
@@ -1790,9 +1802,7 @@
 
           targetRotation.x += deltaY * rotationSpeed;
 
-          // Limit vertical rotation to prevent flipping
-
-          targetRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetRotation.x));
+          // Allow endless rotation by removing limits
 
           lastMousePos = { x: e.clientX, y: e.clientY };
 
@@ -2233,11 +2243,111 @@
 
           numberColor: '#6f9274'
 
+        },
+
+        'Arctic': {
+
+          wireHexColor: '#1a1a2a',
+
+          wirePentColor: '#141424',
+
+          hiddenColor: '#1a1a2a',
+
+          revealedColor: '#2a3a4a',
+
+          flagColor: '#4a5a7a',
+
+          mineColor: '#3a3a4a',
+
+          mineEmissive: '#080820',
+
+          numberColor: '#8aaadd'
+
+        },
+
+        'Monochrome': {
+
+          wireHexColor: '#1a1a1a',
+
+          wirePentColor: '#141414',
+
+          hiddenColor: '#2a2a2a',
+
+          revealedColor: '#3a3a3a',
+
+          flagColor: '#5a5a5a',
+
+          mineColor: '#4a4a4a',
+
+          mineEmissive: '#200000',
+
+          numberColor: '#aaaaaa'
+
+        },
+
+        'Cyber': {
+
+          wireHexColor: '#000000',
+
+          wirePentColor: '#000000',
+
+          hiddenColor: '#0a0a1a',
+
+          revealedColor: '#1a2a3a',
+
+          flagColor: '#3a5a7a',
+
+          mineColor: '#1a0a2a',
+
+          mineEmissive: '#001020',
+
+          numberColor: '#00ffff'
+
+        },
+
+        'Night': {
+
+          wireHexColor: '#0a0a0a',
+
+          wirePentColor: '#050505',
+
+          hiddenColor: '#0f0f1f',
+
+          revealedColor: '#1f1f2f',
+
+          flagColor: '#3a3a5a',
+
+          mineColor: '#2a1a2a',
+
+          mineEmissive: '#200020',
+
+          numberColor: '#aa88ff'
+
+        },
+
+        'Crystal': {
+
+          wireHexColor: '#1a2a3a',
+
+          wirePentColor: '#142030',
+
+          hiddenColor: '#1a2a3a',
+
+          revealedColor: '#3a4a5a',
+
+          flagColor: '#8a5a9a',
+
+          mineColor: '#4a3a5a',
+
+          mineEmissive: '#202050',
+
+          numberColor: '#ccddff'
+
         }
 
       };
 
-      const paletteController = gui.add({ preset: 'Classic' }, 'preset', Object.keys(palettes)).name('Color Palette').onChange((name) => {
+      const paletteController = gui.add({ preset: 'Crystal' }, 'preset', Object.keys(palettes)).name('Color Palette').onChange((name) => {
 
         applyPalette(palettes[name]);
 
