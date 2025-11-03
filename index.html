@@ -495,6 +495,7 @@
     const app = document.getElementById('app');
 
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0f1a);
+    scene.fog = new THREE.Fog(new THREE.Color(0x0a0f1a), 1.5, 3.5);
 
     const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.01, 100); camera.position.set(0, 0, 2.8);
 
@@ -659,7 +660,13 @@
 
       initialRevealPercent: 10,
 
-      backgroundColor: '#0a0f1a'
+      backgroundColor: '#0a0f1a',
+
+      fogEnabled: true,
+
+      fogNear: 1.5,
+
+      fogFar: 3.5
 
     };
 
@@ -1547,6 +1554,17 @@
 
     }
 
+    function updateFog(){
+      if (debugConfig.fogEnabled && scene.fog) {
+        scene.fog.near = debugConfig.fogNear;
+        scene.fog.far = debugConfig.fogFar;
+      } else if (!debugConfig.fogEnabled && scene.fog) {
+        scene.fog = null;
+      } else if (debugConfig.fogEnabled && !scene.fog) {
+        scene.fog = new THREE.Fog(new THREE.Color(debugConfig.backgroundColor), debugConfig.fogNear, debugConfig.fogFar);
+      }
+    }
+
     function updateLights(){
 
       keyLight.color.set(debugConfig.keyLightColor);
@@ -2025,6 +2043,12 @@
 
       f5.add(debugConfig, 'cameraFar', 10, 1000, 10).name('Far').onChange(()=>{ updateCamera(); });
 
+      f5.add(debugConfig, 'fogEnabled').name('Fog Enabled').onChange(()=>{ updateFog(); });
+
+      f5.add(debugConfig, 'fogNear', 0, 5, 0.1).name('Fog Near').onChange(()=>{ updateFog(); });
+
+      f5.add(debugConfig, 'fogFar', 0, 10, 0.1).name('Fog Far').onChange(()=>{ updateFog(); });
+
       const f6 = gui.addFolder('Lighting');
 
       const f6a = f6.addFolder('Key Light');
@@ -2412,6 +2436,10 @@
     // Apply initial light settings from debugConfig
 
     updateLights();
+
+    // Apply initial fog settings from debugConfig
+
+    updateFog();
 
     // Initialize and show debug panel by default
 
