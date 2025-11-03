@@ -1,0 +1,2541 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Spherical Minesweeper – Goldberg Tiling</title>
+
+  <style>
+
+    html, body { height: 100%; margin: 0; background: #0b0d12; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+
+    #app { position: fixed; inset: 0; }
+
+    .ui { position: absolute; top: 12px; left: 12px; padding: 12px 14px; border-radius: 14px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 8px 20px rgba(0,0,0,0.35); display: grid; gap: 10px; min-width: 320px; border: 1px solid rgba(255,255,255,0.06); }
+
+    .row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+
+    .row label { font-size: 12px; opacity: 0.9; }
+
+    .row output { font-variant-numeric: tabular-nums; font-size: 12px; opacity: 0.9; }
+
+    input[type=range] { width: 180px; }
+
+    .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); }
+
+    .btn { font-size: 12px; padding: 6px 10px; border-radius: 10px; color: #0b0d12; background: #9ad1ff; border: 0; cursor: pointer; font-weight: 600; }
+
+    .btn:active { transform: translateY(1px); }
+
+    .ok { color: #b1ffb0; }
+
+    .bad { color: #ff8080; }
+
+    .fps { position: absolute; bottom: 12px; right: 12px; padding: 6px 10px; border-radius: 8px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 4px 12px rgba(0,0,0,0.35); font-size: 11px; font-variant-numeric: tabular-nums; color: #eaeef7; border: 1px solid rgba(255,255,255,0.06); }
+
+    .scoreboard { position: absolute; top: 12px; left: 12px; padding: 12px; border-radius: 12px; backdrop-filter: blur(12px); background: rgba(16,19,30,0.75); box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-width: 260px; border: 1px solid rgba(255,255,255,0.08); }
+
+    .score-section { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+    .score-circle { position: relative; width: 80px; height: 80px; filter: drop-shadow(0 0 8px currentColor); }
+
+    .score-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+    .score-circle circle { fill: none; stroke-width: 8; transition: stroke-dashoffset 0.3s ease; }
+
+    .score-circle .bg { stroke: rgba(255,255,255,0.1); }
+
+    .score-circle .progress-mine { stroke: #ff4d4d; stroke-linecap: round; filter: drop-shadow(0 0 6px #ff4d4d); }
+
+    .score-circle .progress-explore { stroke: #00d4ff; stroke-linecap: round; filter: drop-shadow(0 0 6px #00d4ff); }
+
+    .score-percentage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 22px; font-weight: 700; color: #ffffff; }
+
+    .score-percentage small { font-size: 13px; opacity: 0.7; }
+
+    .score-title { font-size: 11px; font-weight: 600; color: #eaeef7; opacity: 0.9; }
+
+    .score-fraction { font-size: 10px; color: #eaeef7; opacity: 0.7; }
+
+    .scoreboard-buttons { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 4px; }
+
+    .btn-reset { padding: 8px 16px; border-radius: 8px; border: 0; background: rgba(255,255,255,0.1); color: #eaeef7; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+
+    .btn-reset:hover { background: rgba(255,255,255,0.15); }
+
+    .btn-sound { width: 40px; height: 40px; padding: 0; border-radius: 8px; border: 0; background: rgba(255,255,255,0.1); color: #eaeef7; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+
+    .btn-sound:hover { background: rgba(255,255,255,0.15); }
+
+    .btn-sound svg { width: 24px; height: 24px; fill: currentColor; pointer-events: none; }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div id="app"></div>
+
+  <div class="fps" id="fps">FPS: --</div>
+
+  <div class="scoreboard" id="scoreboard">
+    <div class="score-section">
+      <div class="score-circle" id="mineCircle">
+        <svg viewBox="0 0 100 100">
+          <circle class="bg" cx="50" cy="50" r="45"></circle>
+          <circle class="progress-mine" id="mineProgress" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"></circle>
+        </svg>
+        <div class="score-percentage" id="minePercent">0<small>%</small></div>
+      </div>
+      <div class="score-title">Mine Hunt</div>
+      <div class="score-fraction" id="mineFraction">0/0</div>
+    </div>
+    <div class="score-section">
+      <div class="score-circle" id="exploreCircle">
+        <svg viewBox="0 0 100 100">
+          <circle class="bg" cx="50" cy="50" r="45"></circle>
+          <circle class="progress-explore" id="exploreProgress" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"></circle>
+        </svg>
+        <div class="score-percentage" id="explorePercent">0<small>%</small></div>
+      </div>
+      <div class="score-title">Exploration</div>
+      <div class="score-fraction" id="exploreFraction">0/0</div>
+    </div>
+    <div class="scoreboard-buttons">
+      <button class="btn-reset" id="scoreboardReset">Reset</button>
+      <button class="btn-sound" id="scoreboardSound" title="Toggle Sound">
+        <svg class="sound-on" viewBox="0 0 24 24" style="display: block;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        <svg class="sound-off" viewBox="0 0 24 24" style="display: none;"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Three.js (UMD) pinned to r146 so OrbitControls works without modules -->
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
+
+
+
+  <script>
+
+    // ===== Geometry core =====
+
+    function icosahedron(radius = 1) {
+
+      const t = (1 + Math.sqrt(5)) / 2;
+
+      const verts = [
+
+        new THREE.Vector3(-1,  t,  0), new THREE.Vector3( 1,  t,  0), new THREE.Vector3(-1, -t,  0), new THREE.Vector3( 1, -t,  0),
+
+        new THREE.Vector3( 0, -1,  t), new THREE.Vector3( 0,  1,  t), new THREE.Vector3( 0, -1, -t), new THREE.Vector3( 0,  1, -t),
+
+        new THREE.Vector3( t,  0, -1), new THREE.Vector3( t,  0,  1), new THREE.Vector3(-t,  0, -1), new THREE.Vector3(-t,  0,  1),
+
+      ];
+
+      for (const v of verts) v.normalize().multiplyScalar(radius);
+
+      const faces = [
+
+        [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
+
+        [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+
+        [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],
+
+        [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]
+
+      ];
+
+      return { verts, faces };
+
+    }
+
+
+
+    function geodesicSubdivide(base, f, radius=1) {
+
+      if (f < 1) f = 1;
+
+      const vertsMap = new Map();
+
+      const verts = [];
+
+      const faces = [];
+
+      const put = (v) => {
+
+        const s = 1e5;
+
+        const key = `${Math.round(v.x*s)}_${Math.round(v.y*s)}_${Math.round(v.z*s)}`;
+
+        let id = vertsMap.get(key);
+
+        if (id === undefined) {
+
+          const n = v.clone().normalize().multiplyScalar(radius);
+
+          id = verts.length; verts.push(n); vertsMap.set(key, id);
+
+        }
+
+        return id;
+
+      };
+
+      const { verts: bV, faces: bF } = base;
+
+      for (const [a,b,c] of bF) {
+
+        const A = bV[a], B = bV[b], C = bV[c];
+
+        const grid = [];
+
+        for (let i=0; i<=f; i++) {
+
+          grid[i] = [];
+
+          for (let j=0; j<=f-i; j++) {
+
+            const k = f - i - j;
+
+            const p = new THREE.Vector3()
+
+              .addScaledVector(A, i/f)
+
+              .addScaledVector(B, j/f)
+
+              .addScaledVector(C, k/f);
+
+            grid[i][j] = put(p);
+
+          }
+
+        }
+
+        for (let i=0; i<f; i++) {
+
+          for (let j=0; j<f-i; j++) {
+
+            const v0 = grid[i][j];
+
+            const v1 = grid[i+1][j];
+
+            const v2 = grid[i][j+1];
+
+            faces.push([v0, v1, v2]);
+
+            if (j < f - i - 1) {
+
+              const v3 = grid[i+1][j+1];
+
+              faces.push([v1, v3, v2]);
+
+            }
+
+          }
+
+        }
+
+      }
+
+      return { verts, faces };
+
+    }
+
+
+
+    function buildDualPolygons(verts, faces) {
+
+      const incident = Array.from({length: verts.length}, () => []);
+
+      const faceCentroids = faces.map(f => {
+
+        const c = new THREE.Vector3();
+
+        c.add(verts[f[0]]).add(verts[f[1]]).add(verts[f[2]]).multiplyScalar(1/3).normalize();
+
+        return c;
+
+      });
+
+      faces.forEach((f, fi) => { f.forEach(v => incident[v].push(fi)); });
+
+
+
+      const polys = [];
+
+      const tmpU = new THREE.Vector3();
+
+      const tmpV = new THREE.Vector3();
+
+      for (let vi=0; vi<verts.length; vi++) {
+
+        const v = verts[vi].clone().normalize();
+
+        const ref = Math.abs(v.x) < 0.9 ? new THREE.Vector3(1,0,0) : new THREE.Vector3(0,1,0);
+
+        const u = tmpU.copy(ref).cross(v).normalize();
+
+        const w = tmpV.copy(v).cross(u).normalize();
+
+        const list = incident[vi].map(fi => {
+
+          const c = faceCentroids[fi];
+
+          const ang = Math.atan2(c.dot(w), c.dot(u));
+
+          return { fi, ang, c };
+
+        }).sort((a,b)=>a.ang-b.ang);
+
+        polys.push(list.map(o => o.c.clone()));
+
+      }
+
+      return polys; // Array<Array<Vector3>>
+
+    }
+
+
+
+    function buildAdjacency(polys) {
+
+      const vertId = new Map();
+
+      const idOf = (v)=>{
+
+        const s=1e5; const key = `${Math.round(v.x*s)}_${Math.round(v.y*s)}_${Math.round(v.z*s)}`;
+
+        let id = vertId.get(key); if (id===undefined){ id = vertId.size; vertId.set(key,id);} return id;
+
+      };
+
+      const edgeMap = new Map();
+
+      const neigh = polys.map(()=> new Set());
+
+      polys.forEach((poly, pi)=>{
+
+        const ids = poly.map(idOf);
+
+        const n = ids.length;
+
+        for (let i=0;i<n;i++){
+
+          const a = ids[i], b = ids[(i+1)%n];
+
+          const k = a<b ? `${a}_${b}` : `${b}_${a}`;
+
+          const prev = edgeMap.get(k);
+
+          if (prev===undefined) edgeMap.set(k, pi); else { neigh[pi].add(prev); neigh[prev].add(pi); }
+
+        }
+
+      });
+
+      return neigh.map(set=>Array.from(set));
+
+    }
+
+
+
+    function polygonToMesh(poly, mat) {
+
+      const center = new THREE.Vector3(); poly.forEach(p=>center.add(p)); center.multiplyScalar(1/poly.length).normalize();
+
+      const n = poly.length;
+
+      const positions = [];
+
+      for (let i=0;i<n;i++){
+
+        const a = poly[i];
+
+        const b = poly[(i+1)%n];
+
+        positions.push(center.x,center.y,center.z, a.x,a.y,a.z, b.x,b.y,b.z);
+
+      }
+
+      const g = new THREE.BufferGeometry();
+
+      g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(positions),3));
+
+      g.computeVertexNormals();
+
+      return new THREE.Mesh(g, mat);
+
+    }
+
+
+
+    function makeNumberPlane(n, scale, centerNormal) {
+
+      const size = 128; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0,0,size,size);
+
+      // Font size proportional to tile size (scale parameter)
+
+      // Scale ranges roughly from 0.06 to 0.16, map to font size range 96-256px
+
+      const fontSize = Math.max(96, Math.min(256, Math.round(192 * (scale / 0.12))));
+
+      ctx.font = `700 ${fontSize}px system-ui, Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = debugConfig.numberColor;
+
+      ctx.fillText(String(n), size/2, size/2);
+
+      const tex = new THREE.CanvasTexture(canvas); tex.anisotropy = 4; tex.needsUpdate = true;
+
+      const m = new THREE.MeshStandardMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+
+      const geometry = new THREE.PlaneGeometry(1, 1);
+
+      const plane = new THREE.Mesh(geometry, m);
+
+      plane.userData.number = n;
+
+      const k = scale != null ? scale : 0.12;
+
+      plane.scale.set(k, k, 1);
+
+      // Orient plane to lie flat on tile surface (perpendicular to tile normal)
+
+      // Plane's default normal is +Z, so we rotate it to match the tile center (outward normal)
+
+      const quaternion = new THREE.Quaternion();
+
+      quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), centerNormal);
+
+      plane.quaternion.copy(quaternion);
+
+      // Apply rotation offset if configured (rotate around the tile normal)
+
+      if (debugConfig.numberRotation !== 0) {
+
+        plane.rotateOnAxis(centerNormal, debugConfig.numberRotation * (Math.PI / 180));
+
+      }
+
+      return plane;
+
+    }
+
+
+
+    // ===== Utilities =====
+
+    function labelScale(f){
+
+      const k = 0.34 / Math.max(1, f);
+
+      return Math.max(0.06, Math.min(0.16, k));
+
+    }
+
+
+
+    function buildEdgeLines(polys, colorHex, colorPent) {
+
+      const pts = [], pentPts = [];
+
+      const lineRadius = 1.001;
+
+      for (const poly of polys) {
+
+        const n = poly.length;
+
+        for (let i=0; i<n; i++) {
+
+          const a = poly[i]; const b = poly[(i+1)%n];
+
+          pts.push(a.x * lineRadius, a.y * lineRadius, a.z * lineRadius, b.x * lineRadius, b.y * lineRadius, b.z * lineRadius);
+
+        }
+
+        if (n === 5) {
+
+          for (let i=0; i<5; i++) { const a = poly[i]; const b = poly[(i+1)%5]; pentPts.push(a.x * lineRadius, a.y * lineRadius, a.z * lineRadius, b.x * lineRadius, b.y * lineRadius, b.z * lineRadius); }
+
+        }
+
+      }
+
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pts), 3));
+
+      const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: colorHex }));
+
+      let pentLines = null; if (pentPts.length) { const gp = new THREE.BufferGeometry(); gp.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pentPts), 3)); pentLines = new THREE.LineSegments(gp, new THREE.LineBasicMaterial({ color: colorPent })); }
+
+      return { lines, pentLines };
+
+    }
+
+
+
+    // ===== Scene setup =====
+
+    const app = document.getElementById('app');
+
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b0d12);
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.01, 100); camera.position.set(0, 0, 2.8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); app.appendChild(renderer.domElement);
+
+    // Camera is fixed, sphere will rotate instead
+    // const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+
+
+
+    // Professional lighting setup (optimized for camera at 0,0,3.4 looking at origin)
+
+    // Key light (sun) - primary illumination from top-front-right
+
+    // Positioned to create natural highlights visible from camera's initial view
+
+    const keyLight = new THREE.DirectionalLight(0xfff8e1, 3.5);
+
+    keyLight.position.set(2.5, 3.5, 2.0);
+
+    keyLight.castShadow = false;
+
+    scene.add(keyLight);
+
+    // Rim light - back edge definition, opposite to key light
+
+    // Creates subtle edge highlights for depth separation
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.8);
+
+    rimLight.position.set(-2.0, 1.5, -2.5);
+
+    scene.add(rimLight);
+
+    // Ambient light - subtle fill to prevent harsh shadows
+
+    // Provides base illumination without direction
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+
+    scene.add(ambientLight);
+
+
+
+    // Pivot group to rotate the entire sphere (tiles and wireframe)
+    let spherePivot = new THREE.Group();
+    scene.add(spherePivot);
+
+    let wireGroup = new THREE.Group(); spherePivot.add(wireGroup);
+
+    let tileGroup = new THREE.Group(); spherePivot.add(tileGroup);
+
+    // Sphere rotation state for manual rotation
+    let sphereRotation = { x: 0, y: 0 };
+    let targetRotation = { x: 0, y: 0 };
+    let spherePosition = new THREE.Vector3(0, 0, 0);
+    let targetPosition = new THREE.Vector3(0, 0, 0);
+    let isRotating = false;
+    let isPanning = false;
+    let lastMousePos = { x: 0, y: 0 };
+    const rotationSpeed = 0.002;
+    const panSpeed = 0.003;
+    const damping = 0.1; // Smoothing factor for gradual movement
+
+
+
+    // ===== Debug config =====
+
+    const debugConfig = {
+
+      tileDensity: 15,
+
+      mineRatio: 15,
+
+      immortalMode: true,
+
+      wireHexColor: '#000000',
+
+      wirePentColor: '#000000',
+
+      hiddenColor: '#19191b',
+
+      revealedColor: '#13311b',
+
+      flagColor: '#5b2b1c',
+
+      mineColor: '#3e0d0d',
+
+      mineEmissive: '#300508',
+
+      numberOffset: 1.004,
+
+      numberRotation: 0,
+
+      numberRotationX: 0,
+
+      numberRotationY: 0,
+
+      numberRotationZ: 0,
+
+      numberScale: 0.8,
+
+      numberColor: '#6f9274',
+
+      cameraFOV: 37.49999998013179,
+
+      cameraX: 0,
+
+      cameraY: 0,
+
+      cameraZ: 2.8,
+
+      cameraNear: 0.01,
+
+      cameraFar: 100,
+
+      soundEnabled: true,
+
+      soundVolume: 0.5,
+
+      revealSoundIndex: 0,
+
+      flagSoundIndex: 0,
+
+      gameOverSoundIndex: 0,
+
+      clickSoundPitch: 800,
+
+      flagSoundPitch: 600,
+
+      gameOverSoundDuration: 0.5,
+
+      keyLightColor: '#fff8e1',
+
+      keyLightIntensity: 2.6,
+
+      keyLightX: 5,
+
+      keyLightY: 4.8,
+
+      keyLightZ: 0.5,
+
+      keyLightHarshness: 0,
+
+      rimLightColor: '#272743',
+
+      rimLightIntensity: 5,
+
+      rimLightX: -5.300000000000001,
+
+      rimLightY: 0.1,
+
+      rimLightZ: -2.6,
+
+      rimLightHarshness: 0,
+
+      ambientLightColor: '#d1c7f5',
+
+      ambientLightIntensity: 1.5,
+
+      emptyTileRatio: 35,
+
+      initialRevealPercent: 10
+
+    };
+
+
+
+    // ===== Minesweeper state & materials =====
+
+    const matHidden = new THREE.MeshStandardMaterial({ color: debugConfig.hiddenColor, roughness: 0.95, metalness: 0.05 });
+
+    const matRevealed = new THREE.MeshStandardMaterial({ color: debugConfig.revealedColor, roughness: 0.2, metalness: 0.15 });
+
+    const matFlag = new THREE.MeshStandardMaterial({ color: debugConfig.flagColor, roughness: 0.6, metalness: 0.05 });
+
+    const matMine = new THREE.MeshStandardMaterial({ color: debugConfig.mineColor, emissive: debugConfig.mineEmissive, roughness: 0.6 });
+
+    const matEmpty = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0, roughness: 0.95, metalness: 0.05 });
+
+
+
+    const state = { f: debugConfig.tileDensity, polys: [], neighbors: [], tiles: [], firstClick: true, gameOver: false, safeRevealed: 0, totalMines: 0, flags: 0 };
+
+    let revealQueue = [];
+
+    let isRevealing = false;
+
+    // Audio setup
+
+    let audioContext = null;
+
+    const soundBuffers = { reveal: [], flag: [], gameOver: [] };
+
+    function initAudio(){
+
+      if (audioContext) return;
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+      document.addEventListener('click', ()=>{ if (audioContext && audioContext.state === 'suspended') audioContext.resume(); }, { once: true });
+
+    }
+
+    function generateBeep(frequency, duration, type = 'reveal'){
+
+      if (!audioContext) initAudio();
+
+      const oscillator = audioContext.createOscillator();
+
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+
+      gainNode.connect(audioContext.destination);
+
+      if (type === 'reveal'){
+
+        oscillator.frequency.value = frequency;
+
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+
+        gainNode.gain.linearRampToValueAtTime(debugConfig.soundVolume * 0.3, audioContext.currentTime + 0.01);
+
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+
+      } else if (type === 'flag'){
+
+        oscillator.frequency.value = frequency;
+
+        oscillator.type = 'square';
+
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+
+        gainNode.gain.linearRampToValueAtTime(debugConfig.soundVolume * 0.2, audioContext.currentTime + 0.01);
+
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+
+      } else if (type === 'gameOver'){
+
+        oscillator.frequency.value = frequency;
+
+        oscillator.type = 'sawtooth';
+
+        gainNode.gain.setValueAtTime(debugConfig.soundVolume * 0.4, audioContext.currentTime);
+
+        oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.3, audioContext.currentTime + duration);
+
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+
+      }
+
+      oscillator.start(audioContext.currentTime);
+
+      oscillator.stop(audioContext.currentTime + duration);
+
+    }
+
+    function playSound(type){
+
+      if (!debugConfig.soundEnabled || !audioContext) return;
+
+      const volume = debugConfig.soundVolume;
+
+      let buffer = null;
+
+      if (type === 'reveal'){
+
+        if (debugConfig.revealSoundIndex === 0){
+
+          generateBeep(800, 0.1, 'reveal');
+
+          return;
+
+        }
+
+        buffer = soundBuffers.reveal && soundBuffers.reveal[debugConfig.revealSoundIndex - 1];
+
+        if (!buffer){
+
+          generateBeep(800, 0.1, 'reveal');
+
+          return;
+
+        }
+
+      } else if (type === 'flag'){
+
+        if (debugConfig.flagSoundIndex === 0){
+
+          generateBeep(600, 0.08, 'flag');
+
+          return;
+
+        }
+
+        buffer = soundBuffers.flag && soundBuffers.flag[debugConfig.flagSoundIndex - 1];
+
+        if (!buffer){
+
+          generateBeep(600, 0.08, 'flag');
+
+          return;
+
+        }
+
+      } else if (type === 'gameOver'){
+
+        if (debugConfig.gameOverSoundIndex === 0){
+
+          generateBeep(200, 0.5, 'gameOver');
+
+          return;
+
+        }
+
+        buffer = soundBuffers.gameOver && soundBuffers.gameOver[debugConfig.gameOverSoundIndex - 1];
+
+        if (!buffer){
+
+          generateBeep(200, 0.5, 'gameOver');
+
+          return;
+
+        }
+
+      }
+
+      if (buffer){
+
+        try {
+
+          const source = audioContext.createBufferSource();
+
+          const gainNode = audioContext.createGain();
+
+          source.buffer = buffer;
+
+          source.connect(gainNode);
+
+          gainNode.connect(audioContext.destination);
+
+          let duration = buffer.duration;
+
+          if (type === 'reveal' || type === 'flag'){
+
+            duration = Math.min(duration, 0.1);
+
+            gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+
+          } else {
+
+            gainNode.gain.value = volume;
+
+          }
+
+          source.start(0);
+
+          if (type === 'reveal' || type === 'flag'){
+
+            source.stop(audioContext.currentTime + duration);
+
+          }
+
+        } catch (e){
+
+          console.error('Error playing sound:', e);
+
+        }
+
+      }
+
+    }
+
+    function buildTiles() {
+
+      spherePivot.remove(wireGroup); wireGroup.clear(); wireGroup = new THREE.Group(); spherePivot.add(wireGroup);
+
+      spherePivot.remove(tileGroup); tileGroup.clear(); tileGroup = new THREE.Group(); spherePivot.add(tileGroup);
+
+      const wireHex = parseInt(debugConfig.wireHexColor.replace('#', ''), 16);
+
+      const wirePent = parseInt(debugConfig.wirePentColor.replace('#', ''), 16);
+
+      const { lines, pentLines } = buildEdgeLines(state.polys, wireHex, wirePent); wireGroup.add(lines); if (pentLines) wireGroup.add(pentLines);
+
+      state.tiles = state.polys.map((poly, i)=>{
+
+        const mesh = polygonToMesh(poly, matHidden);
+
+        const center = new THREE.Vector3(); poly.forEach(p=>center.add(p)); center.multiplyScalar(1/poly.length).normalize();
+
+        tileGroup.add(mesh);
+
+        return { index:i, mesh, center, mine:false, count:0, flagged:false, revealed:false, label:null, flagMaterial:null, isEmpty:false };
+
+      });
+
+      
+
+      // Mark tiles as empty based on emptyTileRatio, clustering them into groups of at least 3
+
+      const total = state.tiles.length;
+
+      const emptyTarget = Math.floor(total * debugConfig.emptyTileRatio / 100);
+
+      // Algorithm: grow empty clusters by starting from random seeds and expanding
+
+      const indices = [...state.tiles.keys()];
+
+      // Shuffle to randomize seed selection
+
+      for (let i=indices.length-1; i>0; i--){ const j=(Math.random()* (i+1))|0; [indices[i],indices[j]]=[indices[j],indices[i]]; }
+
+      const emptyIndices = new Set();
+
+      // Try to create clusters of at least 3 tiles
+
+      for (let seedIdx of indices) {
+
+        if (emptyIndices.size >= emptyTarget) break;
+
+        if (emptyIndices.has(seedIdx)) continue; // Already part of a cluster
+
+        // Start a new cluster with this seed
+
+        const cluster = [seedIdx];
+
+        emptyIndices.add(seedIdx);
+
+        // Try to expand cluster by adding neighbors
+
+        const queue = [seedIdx];
+
+        const visited = new Set([seedIdx]);
+
+        while (queue.length > 0 && cluster.length < 5 && emptyIndices.size < emptyTarget) {
+
+          const current = queue.shift();
+
+          for (const nb of state.neighbors[current]) {
+
+            if (visited.has(nb)) continue;
+
+            if (emptyIndices.size >= emptyTarget) break;
+
+            // 60% chance to add this neighbor to the cluster
+
+            if (Math.random() < 0.6) {
+
+              cluster.push(nb);
+
+              emptyIndices.add(nb);
+
+              queue.push(nb);
+
+              visited.add(nb);
+
+            }
+
+          }
+
+        }
+
+        // Ensure cluster has at least 3 tiles, otherwise remove it
+
+        if (cluster.length < 3) {
+
+          for (const idx of cluster) {
+
+            emptyIndices.delete(idx);
+
+          }
+
+        }
+
+      }
+
+      // Fill remaining empty tiles if we haven't reached the target
+
+      let remaining = emptyTarget - emptyIndices.size;
+
+      for (let idx of indices) {
+
+        if (remaining <= 0) break;
+
+        if (!emptyIndices.has(idx)) {
+
+          emptyIndices.add(idx);
+
+          remaining--;
+
+        }
+
+      }
+
+      // Apply empty status to all collected indices
+
+      for (const idx of emptyIndices) {
+
+        state.tiles[idx].isEmpty = true;
+
+        state.tiles[idx].mesh.material = matEmpty;
+
+      }
+
+    }
+
+
+
+    function placeMines(excludeIndex, ratioPercent){
+
+      const total = state.tiles.length; const mineTarget = Math.max(1, Math.floor(total * ratioPercent/100));
+
+      state.totalMines = mineTarget; state.flags = 0; state.safeRevealed = 0; state.gameOver=false; updateCounters();
+
+      state.tiles.forEach(t=>{ t.mine=false; t.count=0; t.flagged=false; t.revealed=false; if (t.label){ tileGroup.remove(t.label); t.label.material.map.dispose(); t.label.material.dispose(); t.label=null; } if (t.flagMaterial){ t.flagMaterial.dispose(); t.flagMaterial=null; } t.mesh.material = t.isEmpty ? matEmpty : matHidden; });
+
+      const forbidden = excludeIndex >= 0 ? new Set([excludeIndex, ...state.neighbors[excludeIndex]]) : new Set();
+
+      let placed = 0; const indices = [...state.tiles.keys()].filter(i=>!forbidden.has(i) && !state.tiles[i].isEmpty);
+
+      for (let i=indices.length-1;i>0;i--){ const j=(Math.random()* (i+1))|0; [indices[i],indices[j]]=[indices[j],indices[i]]; }
+
+      for (const idx of indices){ if (placed>=mineTarget) break; state.tiles[idx].mine = true; placed++; }
+
+      state.tiles.forEach((t,i)=>{ if (t.mine) return; let c=0; for (const nb of state.neighbors[i]) if (state.tiles[nb].mine) c++; t.count=c; });
+
+      // Reveal initial percentage of safe tiles at the start
+
+      const safeIndices = state.tiles.map((t, i) => i).filter(i => !state.tiles[i].mine && !state.tiles[i].isEmpty);
+
+      const revealCount = Math.max(1, Math.floor(safeIndices.length * debugConfig.initialRevealPercent / 100));
+
+      // Shuffle safe indices
+
+      for (let i = safeIndices.length - 1; i > 0; i--) {
+
+        const j = Math.floor(Math.random() * (i + 1));
+
+        [safeIndices[i], safeIndices[j]] = [safeIndices[j], safeIndices[i]];
+
+      }
+
+      // Add initial tiles to reveal queue for one-by-one processing
+
+      for (let i = 0; i < revealCount && i < safeIndices.length; i++) {
+
+        revealQueue.push(safeIndices[i]);
+
+      }
+
+      // Process reveal queue with one-by-one timing
+
+      if (revealQueue.length > 0 && !isRevealing) {
+
+        processRevealQueue();
+
+      }
+
+    }
+
+
+
+    function revealSingle(i){
+
+      const t = state.tiles[i]; if (t.revealed || t.flagged || state.gameOver || t.isEmpty) return false;
+
+      t.revealed = true; t.mesh.material = t.mine? matMine : matRevealed;
+
+      if (t.mine){ 
+
+        if (!debugConfig.immortalMode) {
+
+          gameLost(i); 
+
+          return false; 
+
+        }
+
+        // In immortal mode, reveal the mine but don't end the game
+
+        playSound('reveal');
+
+        return false;
+
+      }
+
+      state.safeRevealed++;
+
+      if (t.count>0){ addLabel(i, t.count); }
+
+      // Update heatmap for adjacent flagged tiles
+
+      updateAdjacentFlags(i);
+
+      playSound('reveal');
+
+      checkWin(); updateCounters();
+
+      // If this tile has count 0, recursively reveal adjacent safe tiles
+
+      if (t.count === 0) {
+
+        for (const nb of state.neighbors[i]) {
+
+          const neighbor = state.tiles[nb];
+
+          if (!neighbor.revealed && !neighbor.flagged && !neighbor.isEmpty && !neighbor.mine) {
+
+            revealSingle(nb);
+
+          }
+
+        }
+
+      }
+
+      return true;
+
+    }
+
+    function processRevealQueue(){
+
+      if (revealQueue.length === 0 || isRevealing) return;
+
+      isRevealing = true;
+
+      function revealNext(){
+
+        if (revealQueue.length === 0 || state.gameOver){
+
+          isRevealing = false;
+
+          return;
+
+        }
+
+        const idx = revealQueue.shift();
+
+        if (idx === undefined){
+
+          isRevealing = false;
+
+          return;
+
+        }
+
+        const t = state.tiles[idx];
+
+        if (!t.revealed && !t.flagged){
+
+          const success = revealSingle(idx);
+
+          if (success && t.count === 0){
+
+            for (const nb of state.neighbors[idx]){
+
+              if (!state.tiles[nb].revealed && !state.tiles[nb].flagged && !revealQueue.includes(nb)){
+
+                revealQueue.push(nb);
+
+              }
+
+            }
+
+          }
+
+        }
+
+        setTimeout(revealNext, 8);
+
+      }
+
+      revealNext();
+
+    }
+
+    function reveal(i){
+
+      if (state.gameOver) return;
+
+      const t = state.tiles[i]; if (t.revealed || t.flagged) return;
+
+      if (!isRevealing && revealQueue.length === 0){
+
+        revealQueue.push(i);
+
+        processRevealQueue();
+
+      } else {
+
+        if (!revealQueue.includes(i)) revealQueue.push(i);
+
+      }
+
+    }
+
+
+
+    function addLabel(i, n){
+
+      const t = state.tiles[i]; if (t.label) return;
+
+      const baseScale = labelScale(state.f);
+
+      const s = makeNumberPlane(n, baseScale * debugConfig.numberScale, t.center.clone().normalize());
+
+      s.position.copy(t.center).multiplyScalar(debugConfig.numberOffset);
+
+      tileGroup.add(s); t.label = s;
+
+    }
+
+    function updateLabels(){
+
+      state.tiles.forEach(t => {
+
+        if (t.label) {
+
+          const baseScale = labelScale(state.f);
+
+          const scale = baseScale * debugConfig.numberScale;
+
+          t.label.scale.set(scale, scale, 1);
+
+          t.label.position.copy(t.center).multiplyScalar(debugConfig.numberOffset);
+
+          // Update plane orientation to match tile surface
+
+          const centerNormal = t.center.clone().normalize();
+
+          // Get world position of label to check viewing angle
+
+          const worldPos = new THREE.Vector3();
+
+          t.label.getWorldPosition(worldPos);
+
+          // Calculate direction from label to camera
+
+          const dirToCamera = new THREE.Vector3().subVectors(camera.position, worldPos).normalize();
+
+          // Check if viewing from back side (camera direction opposite to tile normal)
+
+          const viewingFromBack = centerNormal.dot(dirToCamera) < 0;
+
+          const quaternion = new THREE.Quaternion();
+
+          quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), centerNormal);
+
+          t.label.quaternion.copy(quaternion);
+
+          // If viewing from back, rotate 180° around the tile normal to prevent mirroring
+
+          if (viewingFromBack) {
+
+            t.label.rotateOnAxis(centerNormal, Math.PI);
+
+          }
+
+          // Apply rotation offset if configured (rotate around the tile normal)
+
+          if (debugConfig.numberRotation !== 0) {
+
+            t.label.rotateOnAxis(centerNormal, debugConfig.numberRotation * (Math.PI / 180));
+
+          }
+
+          // Apply additional rotation offsets from debug panel (in local space after base orientation)
+
+          if (debugConfig.numberRotationX !== 0) {
+
+            const localAxisX = new THREE.Vector3(1, 0, 0);
+
+            localAxisX.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisX.normalize(), debugConfig.numberRotationX * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationY !== 0) {
+
+            const localAxisY = new THREE.Vector3(0, 1, 0);
+
+            localAxisY.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisY.normalize(), debugConfig.numberRotationY * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationZ !== 0) {
+
+            const localAxisZ = new THREE.Vector3(0, 0, 1);
+
+            localAxisZ.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisZ.normalize(), debugConfig.numberRotationZ * (Math.PI / 180));
+
+          }
+
+          // Update color by regenerating texture
+
+          const n = t.label.userData.number || t.count;
+
+          const texture = t.label.material.map;
+
+          const canvas = texture.image;
+
+          const ctx = canvas.getContext('2d');
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+          // Font size proportional to tile size (reuse baseScale from above)
+
+          const currentScale = baseScale * debugConfig.numberScale;
+
+          const fontSize = Math.max(96, Math.min(256, Math.round(192 * (currentScale / 0.12))));
+
+          ctx.font = `700 ${fontSize}px system-ui, Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+          ctx.fillStyle = debugConfig.numberColor;
+
+          ctx.fillText(String(n), canvas.width/2, canvas.height/2);
+
+          texture.needsUpdate = true;
+
+        }
+
+      });
+
+    }
+
+
+
+    function calculateFlagHeat(flagIndex){
+
+      const t = state.tiles[flagIndex];
+
+      if (!t.flagged) return 0;
+
+      let heat = 0;
+
+      for (const nbIndex of state.neighbors[flagIndex]){
+
+        const neighbor = state.tiles[nbIndex];
+
+        if (neighbor.revealed && neighbor.count > 0){
+
+          heat += neighbor.count;
+
+        }
+
+      }
+
+      return heat;
+
+    }
+
+    function getFlagColorFromHeat(heat){
+
+      // Use user-selected flag color as base
+      // Heat ranges from 0 to ~24 (8 neighbors * 3 max each, but typically much lower)
+      // Normalize heat to 0-1 range (assuming max practical heat around 12)
+      const maxHeat = 12;
+      const heatFactor = Math.min(heat / maxHeat, 1);
+
+      // Parse base color from debugConfig.flagColor (hex format: #RRGGBB)
+      const baseColor = debugConfig.flagColor.replace('#', '');
+      const baseR = parseInt(baseColor.substr(0, 2), 16);
+      const baseG = parseInt(baseColor.substr(2, 2), 16);
+      const baseB = parseInt(baseColor.substr(4, 2), 16);
+
+      // Higher heat = darker (lower RGB values)
+      // Invert: higher heatFactor → lower intensity → darker color
+      const intensity = 1.0 - (heatFactor * 0.7); // 1.0 to 0.3 (inverted) - more dramatic contrast
+
+      const r = Math.floor(baseR * intensity);
+      const g = Math.floor(baseG * intensity);
+      const b = Math.floor(baseB * intensity);
+
+      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+
+    }
+
+    function updateFlagMaterial(i){
+
+      const t = state.tiles[i];
+
+      if (!t.flagged) return;
+
+      const heat = calculateFlagHeat(i);
+
+      const heatColor = getFlagColorFromHeat(heat);
+
+      if (!t.flagMaterial){
+
+        t.flagMaterial = new THREE.MeshStandardMaterial({ color: heatColor, roughness: matFlag.roughness, metalness: matFlag.metalness });
+
+      } else {
+
+        t.flagMaterial.color.set(heatColor);
+
+      }
+
+      t.mesh.material = t.flagMaterial;
+
+    }
+
+    function updateAdjacentFlags(i){
+
+      // When a tile is revealed, update all adjacent flagged tiles
+
+      for (const nbIndex of state.neighbors[i]){
+
+        const neighbor = state.tiles[nbIndex];
+
+        if (neighbor.flagged){
+
+          updateFlagMaterial(nbIndex);
+
+        }
+
+      }
+
+    }
+
+    function toggleFlag(i){ 
+
+      const t = state.tiles[i]; 
+
+      if (t.revealed || state.gameOver) return; 
+
+      t.flagged = !t.flagged; 
+
+      if (t.flagged){
+
+        updateFlagMaterial(i);
+
+      } else {
+
+        if (t.flagMaterial){
+
+          t.flagMaterial.dispose();
+
+          t.flagMaterial = null;
+
+        }
+
+        t.mesh.material = matHidden;
+
+      }
+
+      state.flags += t.flagged ? 1 : -1; 
+
+      playSound('flag'); 
+
+      updateCounters(); 
+
+    }
+
+
+
+    function chord(i){ const t = state.tiles[i]; if (!t.revealed || state.gameOver) return; const flagsAround = state.neighbors[i].reduce((acc,nb)=> acc + (state.tiles[nb].flagged?1:0),0); if (flagsAround === t.count){ for (const nb of state.neighbors[i]) if (!state.tiles[nb].flagged && !state.tiles[nb].revealed) reveal(nb); } }
+
+
+
+    function gameLost(){ state.gameOver = true; playSound('gameOver'); state.tiles.forEach((t)=>{ if (t.mine){ t.mesh.material = matMine; if (!t.revealed) { t.revealed = true; } } }); }
+
+
+
+    function checkWin(){ const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length; if (state.safeRevealed >= totalSafe){ state.gameOver = true; } }
+
+
+
+    function updateCounters(){ 
+      // Update scoreboard
+      // Calculate total safe tiles (excluding mines and empty tiles)
+      const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length;
+      
+      // Mine Hunt: flags / totalMines
+      const minePercent = state.totalMines > 0 ? Math.round((state.flags / state.totalMines) * 100) : 0;
+      const mineProgress = document.getElementById('mineProgress');
+      const minePercentEl = document.getElementById('minePercent');
+      const mineFractionEl = document.getElementById('mineFraction');
+      if (mineProgress) {
+        const circumference = 2 * Math.PI * 45; // SVG units (viewBox radius), not pixels
+        const offset = circumference - (minePercent / 100) * circumference;
+        mineProgress.style.strokeDashoffset = offset;
+      }
+      if (minePercentEl) minePercentEl.innerHTML = `${minePercent}<small>%</small>`;
+      if (mineFractionEl) mineFractionEl.textContent = `${state.flags}/${state.totalMines}`;
+      
+      // Exploration: safeRevealed / totalSafe (empty tiles excluded)
+      const explorePercent = totalSafe > 0 ? Math.round((state.safeRevealed / totalSafe) * 100) : 0;
+      const exploreProgress = document.getElementById('exploreProgress');
+      const explorePercentEl = document.getElementById('explorePercent');
+      const exploreFractionEl = document.getElementById('exploreFraction');
+      if (exploreProgress) {
+        const circumference = 2 * Math.PI * 45; // SVG units (viewBox radius), not pixels
+        const offset = circumference - (explorePercent / 100) * circumference;
+        exploreProgress.style.strokeDashoffset = offset;
+      }
+      if (explorePercentEl) explorePercentEl.innerHTML = `${explorePercent}<small>%</small>`;
+      if (exploreFractionEl) exploreFractionEl.textContent = `${state.safeRevealed}/${totalSafe}`;
+    }
+
+
+
+    function updateMaterials(){
+
+      matHidden.color.set(debugConfig.hiddenColor);
+
+      matRevealed.color.set(debugConfig.revealedColor);
+
+      matFlag.color.set(debugConfig.flagColor);
+
+      matMine.color.set(debugConfig.mineColor);
+
+      matMine.emissive.set(debugConfig.mineEmissive);
+
+      // Update all flagged tiles to recalculate heatmap with new flag color
+
+      state.tiles.forEach(t => {
+
+        if (t.isEmpty) { t.mesh.material = matEmpty; }
+
+        else if (t.revealed) { t.mesh.material = t.mine ? matMine : matRevealed; }
+
+        else if (t.flagged) { 
+
+          // Force recalculation of flag material when flag color changes
+
+          if (t.flagMaterial) {
+
+            t.flagMaterial.dispose();
+
+            t.flagMaterial = null;
+
+          }
+
+          updateFlagMaterial(t.index);
+
+        }
+
+        else { t.mesh.material = matHidden; }
+
+      });
+
+    }
+
+
+
+    function updateWireframe(){
+
+      spherePivot.remove(wireGroup); wireGroup.clear(); wireGroup = new THREE.Group(); spherePivot.add(wireGroup);
+
+      const wireHex = parseInt(debugConfig.wireHexColor.replace('#', ''), 16);
+
+      const wirePent = parseInt(debugConfig.wirePentColor.replace('#', ''), 16);
+
+      const { lines, pentLines } = buildEdgeLines(state.polys, wireHex, wirePent);
+
+      wireGroup.add(lines); if (pentLines) wireGroup.add(pentLines);
+
+    }
+
+    function updateCamera(){
+
+      camera.fov = debugConfig.cameraFOV;
+
+      camera.near = debugConfig.cameraNear;
+
+      camera.far = debugConfig.cameraFar;
+
+      camera.position.set(debugConfig.cameraX, debugConfig.cameraY, debugConfig.cameraZ);
+
+      camera.updateProjectionMatrix();
+
+      // Camera is fixed, no controls.update() needed
+
+    }
+
+    function updateLights(){
+
+      keyLight.color.set(debugConfig.keyLightColor);
+
+      keyLight.intensity = debugConfig.keyLightIntensity;
+
+      keyLight.position.set(debugConfig.keyLightX, debugConfig.keyLightY, debugConfig.keyLightZ);
+
+      rimLight.color.set(debugConfig.rimLightColor);
+
+      rimLight.position.set(debugConfig.rimLightX, debugConfig.rimLightY, debugConfig.rimLightZ);
+
+      ambientLight.color.set(debugConfig.ambientLightColor);
+
+      ambientLight.intensity = debugConfig.ambientLightIntensity;
+
+      // Key light harshness affects material properties (how key light interacts with surfaces)
+
+      // Convert key light harshness (0-1) to roughness adjustment (more subtle range): lower harshness = higher roughness (more diffuse)
+
+      // Base roughness values
+      const baseRoughnessHidden = 0.95;
+      const baseRoughnessRevealed = 0.55;
+      const baseMetalness = 0.05;
+
+      // Harshness only adjusts roughness slightly (reduced range: 0.2 instead of 0.75)
+      const roughnessAdjustment = debugConfig.keyLightHarshness * 0.2;
+
+      const targetRoughness = baseRoughnessHidden - roughnessAdjustment;
+
+      // Update materials with new roughness for softer/harsher key light response
+
+      matHidden.roughness = targetRoughness;
+
+      matRevealed.roughness = Math.max(0.1, baseRoughnessRevealed - roughnessAdjustment); // Revealed tiles can be shinier
+
+      matFlag.roughness = targetRoughness;
+
+      // Update all flag materials with new roughness/metalness
+
+      state.tiles.forEach(t => {
+
+        if (t.flagMaterial){
+
+          t.flagMaterial.roughness = targetRoughness;
+
+          t.flagMaterial.metalness = specularFactor;
+
+        }
+
+      });
+
+      matMine.roughness = targetRoughness;
+
+      // Also adjust specular contribution based on key light harshness (more subtle)
+
+      const specularFactor = baseMetalness + (debugConfig.keyLightHarshness * 0.08); // Reduced from 0.15 to 0.08
+
+      matHidden.metalness = specularFactor;
+
+      matRevealed.metalness = specularFactor + 0.1;
+
+      matFlag.metalness = specularFactor;
+
+      matMine.metalness = specularFactor;
+
+      // Rim light harshness affects rim light intensity (how much rim light contributes)
+      // Harshness 0 = 70% intensity (softer), Harshness 1 = 100% intensity (reduced range for less dramatic effect)
+      rimLight.intensity = debugConfig.rimLightIntensity * (0.7 + debugConfig.rimLightHarshness * 0.3);
+
+    }
+
+    function rebuildCore(f){
+
+      f = Math.max(1, Math.floor(f)); state.f = f;
+
+      debugConfig.tileDensity = f;
+
+      const est = 10*f*f + 2; const tileEl = document.getElementById('tileCount'); if (tileEl) tileEl.textContent = `≈ 10·${f}² + 2 = ${est.toLocaleString()}`;
+
+      const base = icosahedron(1); const geo  = geodesicSubdivide(base, f, 1);
+
+      state.polys = buildDualPolygons(geo.verts, geo.faces); state.neighbors = buildAdjacency(state.polys);
+
+      buildTiles(); state.firstClick = true; state.gameOver=false; state.safeRevealed=0; state.totalMines=0; state.flags=0; updateCounters(); spherePivot.position.set(0, 0, 0); targetPosition.set(0, 0, 0); spherePosition.set(0, 0, 0); targetRotation.x = 0; targetRotation.y = 0; sphereRotation.x = 0; sphereRotation.y = 0;
+      
+      // Place mines and reveal initial tiles automatically
+      placeMines(-1, debugConfig.mineRatio); state.firstClick = false;
+
+    }
+
+
+
+    // Picking
+
+    const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+
+    function pickTile(event){
+
+      const rect = renderer.domElement.getBoundingClientRect();
+
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera); const hits = raycaster.intersectObjects(tileGroup.children, false);
+
+      if (hits.length===0) return -1; const mesh = hits[0].object; const idx = state.tiles.findIndex(t=>t.mesh===mesh); return idx;
+
+    }
+
+
+
+    renderer.domElement.addEventListener('contextmenu', (e)=>{
+
+      e.preventDefault();
+
+      // Right-click flagging when not dragging or panning
+
+      // Don't flag if right-click drag (panning) occurred
+
+      if (!rightClickPanned) {
+
+        const idx = pickTile(e);
+
+        if (idx >= 0){
+
+          toggleFlag(idx);
+
+        }
+
+      }
+
+      rightClickPanned = false; // Reset after handling contextmenu
+
+    });
+
+    let mouseDownPos = null;
+
+    let mouseDownButton = null;
+
+    let wasDragging = false;
+
+    let rightClickPanned = false; // Track if right-click resulted in panning
+
+    const dragThreshold = 3;
+
+    renderer.domElement.addEventListener('mousedown', (e)=>{
+
+      if (e.button === 0) { // Left mouse button for rotation
+
+        mouseDownPos = { x: e.clientX, y: e.clientY };
+
+        mouseDownButton = e.button;
+
+        wasDragging = false;
+
+        isRotating = false;
+
+        isPanning = false;
+
+        lastMousePos = { x: e.clientX, y: e.clientY };
+
+      } else if (e.button === 2) { // Right mouse button for panning
+
+        mouseDownPos = { x: e.clientX, y: e.clientY };
+
+        mouseDownButton = e.button;
+
+        wasDragging = false;
+
+        isRotating = false;
+
+        isPanning = false;
+
+        rightClickPanned = false;
+
+        lastMousePos = { x: e.clientX, y: e.clientY };
+
+      }
+
+    });
+
+    renderer.domElement.addEventListener('mousemove', (e)=>{
+
+      if (mouseDownPos === null) return;
+
+      const dx = e.clientX - mouseDownPos.x;
+
+      const dy = e.clientY - mouseDownPos.y;
+
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      if (dist > dragThreshold) {
+
+        wasDragging = true;
+
+        const deltaX = e.clientX - lastMousePos.x;
+
+        const deltaY = e.clientY - lastMousePos.y;
+
+        if (mouseDownButton === 0) { // Left button for rotation
+
+          isRotating = true;
+
+          targetRotation.y += deltaX * rotationSpeed;
+
+          targetRotation.x += deltaY * rotationSpeed;
+
+          // Limit vertical rotation to prevent flipping
+
+          targetRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetRotation.x));
+
+          lastMousePos = { x: e.clientX, y: e.clientY };
+
+        } else if (mouseDownButton === 2) { // Right button for panning
+
+          isPanning = true;
+
+          rightClickPanned = true; // Mark that panning occurred
+
+          // Pan by translating the sphere pivot in camera space
+
+          const cameraForward = new THREE.Vector3();
+
+          camera.getWorldDirection(cameraForward);
+
+          const cameraRight = new THREE.Vector3().crossVectors(cameraForward, camera.up).normalize();
+
+          const panVector = new THREE.Vector3();
+
+          // Fixed direction: right drag = move right, down drag = move down
+          panVector.addScaledVector(cameraRight, deltaX * panSpeed);
+
+          panVector.addScaledVector(camera.up.clone(), -deltaY * panSpeed);
+
+          targetPosition.add(panVector);
+
+          lastMousePos = { x: e.clientX, y: e.clientY };
+
+        }
+
+      }
+
+    });
+
+    renderer.domElement.addEventListener('mouseup', (e)=>{
+
+      if (mouseDownPos === null) return;
+
+      if (wasDragging && (isRotating || isPanning)) {
+
+        isRotating = false;
+
+        isPanning = false;
+
+        mouseDownPos = null;
+
+        mouseDownButton = null;
+
+        wasDragging = false;
+
+        return;
+
+      }
+
+      if (wasDragging) {
+
+        mouseDownPos = null;
+
+        mouseDownButton = null;
+
+        wasDragging = false;
+
+        return;
+
+      }
+
+      const idx = pickTile(e);
+
+      if (idx >= 0) {
+
+        // Right click is now for panning, not flagging
+        // To flag, use middle mouse button or context menu could be added
+        if (mouseDownButton === 0) {
+
+          if (state.firstClick){ placeMines(idx, debugConfig.mineRatio); state.firstClick = false; }
+
+          reveal(idx);
+
+        }
+
+      }
+
+      mouseDownPos = null;
+
+      mouseDownButton = null;
+
+      wasDragging = false;
+
+    });
+
+    renderer.domElement.addEventListener('click', (e)=>{
+
+      if (wasDragging || e.button !== 0) return;
+
+      const idx = pickTile(e); if (idx<0) return;
+
+      if (e.detail === 2){ chord(idx); return; }
+
+    });
+
+    renderer.domElement.addEventListener('mouseleave', (e)=>{
+
+      mouseDownPos = null;
+
+      mouseDownButton = null;
+
+      wasDragging = false;
+
+      isRotating = false;
+
+      isPanning = false;
+
+      rightClickPanned = false;
+
+    });
+
+    renderer.domElement.addEventListener('wheel', (e)=>{
+
+      e.preventDefault();
+
+      const fovChange = e.deltaY * 0.005; // Sensitivity: 0.005 degrees per wheel step (wheel up = zoom out = higher FOV)
+
+      const newFOV = Math.max(10, Math.min(120, debugConfig.cameraFOV + fovChange));
+
+      debugConfig.cameraFOV = newFOV;
+
+      updateCamera();
+
+      // Update GUI if it exists
+
+      if (gui) {
+
+        const fovController = gui.__controllers.find(c => c.property === 'cameraFOV');
+
+        if (fovController) fovController.updateDisplay();
+
+      }
+
+    }, { passive: false });
+
+
+
+    // Self-tests
+
+    function runTests(){
+
+      const statusEl = document.getElementById('testStatus'); const results = [];
+
+      function assert(name, cond){ results.push({name, pass: !!cond}); if(!cond) console.error('Test failed:', name); }
+
+      for (let f=1; f<=6; f++){
+
+        const base = icosahedron(1); const geo  = geodesicSubdivide(base, f, 1); const polys = buildDualPolygons(geo.verts, geo.faces); const neigh = buildAdjacency(polys);
+
+        const counts = polys.reduce((acc,p)=>{ acc.total++; acc['n'+p.length]=(acc['n'+p.length]||0)+1; return acc; }, {total:0});
+
+        assert(`f=${f}: pentagons==12`, counts.n5 === 12);
+
+        assert(`f=${f}: only hex/pent`, (counts.n5||0) + (counts.n6||0) === polys.length);
+
+        assert(`f=${f}: tiles==10 f^2 + 2`, polys.length === 10*f*f + 2);
+
+        const degOK = neigh.every((ns, i)=> (polys[i].length===5 ? ns.length===5 : (ns.length===6)) ); assert(`f=${f}: degrees 5/6`, degOK);
+
+      }
+
+      const failed = results.filter(r=>!r.pass).length; if (statusEl) { statusEl.textContent = failed===0 ? `All ${results.length} tests passed` : `${failed}/${results.length} tests failed`; statusEl.className = 'pill ' + (failed===0 ? 'ok' : 'bad'); }
+
+    }
+
+
+
+    // UI
+    
+    // Scoreboard button handlers
+    document.getElementById('scoreboardReset').addEventListener('click', ()=>{ rebuildCore(state.f); });
+    document.getElementById('scoreboardSound').addEventListener('click', ()=>{
+      debugConfig.soundEnabled = !debugConfig.soundEnabled;
+      // Update button icon
+      const soundBtn = document.getElementById('scoreboardSound');
+      const soundOnSvg = soundBtn.querySelector('.sound-on');
+      const soundOffSvg = soundBtn.querySelector('.sound-off');
+      if (debugConfig.soundEnabled) {
+        soundOnSvg.style.display = 'block';
+        soundOffSvg.style.display = 'none';
+      } else {
+        soundOnSvg.style.display = 'none';
+        soundOffSvg.style.display = 'block';
+      }
+      // Update GUI if initialized
+      if (gui) {
+        const soundController = gui.__controllers.find(c => c.property === 'soundEnabled');
+        if (soundController) soundController.setValue(debugConfig.soundEnabled);
+      }
+    });
+
+    // ===== Debug GUI =====
+
+    let gui = null;
+
+    let guiVisible = false;
+
+    function initGUI(){
+
+      if (gui) return;
+
+      gui = new dat.GUI({ autoPlace: true, closed: false });
+
+      const f1 = gui.addFolder('Game Settings');
+
+      f1.add(debugConfig, 'tileDensity', 1, 20, 1).name('Tile Density').onChange((val)=>{ rebuildCore(Math.floor(val)); });
+
+      f1.add(debugConfig, 'mineRatio', 5, 30, 1).name('Mine %');
+
+      f1.add(debugConfig, 'emptyTileRatio', 0, 50, 1).name('Empty Tile %').onChange(()=>{ rebuildCore(state.f); });
+
+      f1.add(debugConfig, 'initialRevealPercent', 0, 50, 1).name('Initial Reveal %');
+
+      f1.add(debugConfig, 'immortalMode').name('Immortal Mode');
+
+      const f2 = gui.addFolder('Wireframe Colors');
+
+      f2.addColor(debugConfig, 'wireHexColor').name('Hex Color').onChange(()=>{ if (state.polys.length) updateWireframe(); });
+
+      f2.addColor(debugConfig, 'wirePentColor').name('Pent Color').onChange(()=>{ if (state.polys.length) updateWireframe(); });
+
+      const f3 = gui.addFolder('Tile Colors');
+
+      f3.addColor(debugConfig, 'hiddenColor').name('Hidden').onChange(()=>{ updateMaterials(); });
+
+      f3.addColor(debugConfig, 'revealedColor').name('Revealed').onChange(()=>{ updateMaterials(); });
+
+      f3.addColor(debugConfig, 'flagColor').name('Flag').onChange(()=>{ updateMaterials(); });
+
+      f3.addColor(debugConfig, 'mineColor').name('Mine').onChange(()=>{ updateMaterials(); });
+
+      f3.addColor(debugConfig, 'mineEmissive').name('Mine Emissive').onChange(()=>{ updateMaterials(); });
+
+      const f4 = gui.addFolder('Number Labels');
+
+      f4.add(debugConfig, 'numberOffset', 0.98, 1.05, 0.001).name('Offset').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberRotation', -180, 180, 1).name('Rotation (deg)').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberRotationX', -180, 180, 1).name('Rotation X (deg)').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberRotationY', -180, 180, 1).name('Rotation Y (deg)').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberRotationZ', -180, 180, 1).name('Rotation Z (deg)').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberScale', 0.5, 2.0, 0.1).name('Scale').onChange(()=>{ updateLabels(); });
+
+      f4.addColor(debugConfig, 'numberColor').name('Color').onChange(()=>{ updateLabels(); });
+
+      const f5 = gui.addFolder('Camera');
+
+      f5.add(debugConfig, 'cameraFOV', 10, 120, 1).name('FOV').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraX', -10, 10, 0.1).name('Position X').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraY', -10, 10, 0.1).name('Position Y').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraZ', 1, 10, 0.1).name('Position Z').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraNear', 0.001, 1, 0.001).name('Near').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraFar', 10, 1000, 10).name('Far').onChange(()=>{ updateCamera(); });
+
+      const f6 = gui.addFolder('Lighting');
+
+      const f6a = f6.addFolder('Key Light');
+
+      f6a.addColor(debugConfig, 'keyLightColor').name('Color').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightIntensity', 0, 10, 0.1).name('Intensity').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightX', -10, 10, 0.1).name('Position X').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightY', -10, 10, 0.1).name('Position Y').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightZ', -10, 10, 0.1).name('Position Z').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightHarshness', 0, 1, 0.05).name('Harshness').onChange(()=>{ updateLights(); });
+
+      const f6b = f6.addFolder('Rim Light');
+
+      f6b.addColor(debugConfig, 'rimLightColor').name('Color').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightIntensity', 0, 10, 0.1).name('Intensity').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightX', -10, 10, 0.1).name('Position X').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightY', -10, 10, 0.1).name('Position Y').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightZ', -10, 10, 0.1).name('Position Z').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightHarshness', 0, 1, 0.05).name('Harshness').onChange(()=>{ updateLights(); });
+
+      const f6c = f6.addFolder('Ambient Light');
+
+      f6c.addColor(debugConfig, 'ambientLightColor').name('Color').onChange(()=>{ updateLights(); });
+
+      f6c.add(debugConfig, 'ambientLightIntensity', 0, 10, 0.1).name('Intensity').onChange(()=>{ updateLights(); });
+
+      const f7 = gui.addFolder('Sound Effects');
+
+      f7.add(debugConfig, 'soundEnabled').name('Enabled');
+
+      f7.add(debugConfig, 'soundVolume', 0, 1, 0.01).name('Volume');
+
+      f7.add(debugConfig, 'revealSoundIndex', { 'Beep (Default)': 0, 'Click 1': 1, 'Click 2': 2, 'Click 3': 3, 'Click 4': 4, 'Click 5': 5 }).name('Reveal Sound');
+
+      f7.add(debugConfig, 'flagSoundIndex', { 'Beep (Default)': 0, 'Flag 1': 1, 'Flag 2': 2, 'Flag 3': 3, 'Flag 4': 4, 'Flag 5': 5 }).name('Flag Sound');
+
+      f7.add(debugConfig, 'gameOverSoundIndex', { 'Beep (Default)': 0, 'Valve 1': 1, 'Valve 2': 2, 'Valve 3': 3, 'Valve 4': 4, 'Valve 5': 5 }).name('Game Over Sound');
+
+      // Color palette presets
+
+      const applyPalette = (preset) => {
+
+        Object.keys(preset).forEach(key => {
+
+          if (debugConfig.hasOwnProperty(key)) {
+
+            debugConfig[key] = preset[key];
+
+          }
+
+        });
+
+        // Update all visuals
+
+        updateMaterials();
+
+        updateWireframe();
+
+        updateLabels();
+
+      };
+
+      const palettes = {
+
+        'Forest': {
+
+          wireHexColor: '#1a1a1a',
+
+          wirePentColor: '#141414',
+
+          hiddenColor: '#1d251d',
+
+          revealedColor: '#0f2f15',
+
+          flagColor: '#4a4a1a',
+
+          mineColor: '#3e1a1a',
+
+          mineEmissive: '#200808',
+
+          numberColor: '#5a7a5f'
+
+        },
+
+        'Ocean': {
+
+          wireHexColor: '#1a1a2e',
+
+          wirePentColor: '#162131',
+
+          hiddenColor: '#1d1d2e',
+
+          revealedColor: '#15242e',
+
+          flagColor: '#1a2a4a',
+
+          mineColor: '#1a1a3e',
+
+          mineEmissive: '#080820',
+
+          numberColor: '#5a7a9a'
+
+        },
+
+        'Desert': {
+
+          wireHexColor: '#2a2419',
+
+          wirePentColor: '#211e16',
+
+          hiddenColor: '#2d2520',
+
+          revealedColor: '#2d2a20',
+
+          flagColor: '#6a5a3a',
+
+          mineColor: '#4a3a2a',
+
+          mineEmissive: '#201810',
+
+          numberColor: '#9a8a6a'
+
+        },
+
+        'Sunset': {
+
+          wireHexColor: '#2a1814',
+
+          wirePentColor: '#1f120f',
+
+          hiddenColor: '#2a1d1a',
+
+          revealedColor: '#3d2a1a',
+
+          flagColor: '#6a3a2a',
+
+          mineColor: '#4a1a1a',
+
+          mineEmissive: '#400808',
+
+          numberColor: '#ff8a5a'
+
+        },
+
+        'Classic': {
+
+          wireHexColor: '#000000',
+
+          wirePentColor: '#000000',
+
+          hiddenColor: '#222223',
+
+          revealedColor: '#172c1f',
+
+          flagColor: '#5b2b1c',
+
+          mineColor: '#3e0d0d',
+
+          mineEmissive: '#300508',
+
+          numberColor: '#6f9274'
+
+        }
+
+      };
+
+      const paletteController = gui.add({ preset: 'Classic' }, 'preset', Object.keys(palettes)).name('Color Palette').onChange((name) => {
+
+        applyPalette(palettes[name]);
+
+      });
+
+      // Copy to clipboard function
+
+      const copyConfig = () => {
+
+        const config = JSON.stringify(debugConfig, null, 2);
+
+        navigator.clipboard.writeText(config).then(() => {
+
+          console.log('Debug config copied to clipboard');
+
+        }).catch(err => {
+
+          console.error('Failed to copy:', err);
+
+          // Fallback for older browsers
+
+          const textArea = document.createElement('textarea');
+
+          textArea.value = config;
+
+          textArea.style.position = 'fixed';
+
+          textArea.style.opacity = '0';
+
+          document.body.appendChild(textArea);
+
+          textArea.select();
+
+          document.execCommand('copy');
+
+          document.body.removeChild(textArea);
+
+        });
+
+      };
+
+      gui.add({ copyConfig }, 'copyConfig').name('Copy Config to Clipboard');
+
+      guiVisible = true;
+
+      gui.domElement.style.display = 'block';
+
+    }
+
+    function toggleGUI(){
+
+      if (!gui) initGUI();
+
+      guiVisible = !guiVisible;
+
+      gui.domElement.style.display = guiVisible ? 'block' : 'none';
+
+    }
+
+    addEventListener('keydown', (e)=>{
+
+      if (e.ctrlKey && e.shiftKey && e.altKey && e.key === 'D'){
+
+        e.preventDefault();
+
+        toggleGUI();
+
+      }
+
+    });
+
+
+
+    // Start
+
+    initAudio();
+
+    // Apply initial light settings from debugConfig
+
+    updateLights();
+
+    rebuildCore(debugConfig.tileDensity); runTests();
+
+    addEventListener('resize', ()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+    let lastTime = performance.now();
+
+    let frameCount = 0;
+
+    let fps = 0;
+
+    renderer.setAnimationLoop(()=>{ 
+
+      // Smooth rotation interpolation for gradual movement
+
+      const lerpFactor = damping;
+
+      sphereRotation.x += (targetRotation.x - sphereRotation.x) * lerpFactor;
+
+      sphereRotation.y += (targetRotation.y - sphereRotation.y) * lerpFactor;
+
+      spherePivot.rotation.x = sphereRotation.x;
+
+      spherePivot.rotation.y = sphereRotation.y;
+
+      // Smooth panning interpolation
+
+      spherePosition.lerp(targetPosition, lerpFactor);
+
+      spherePivot.position.copy(spherePosition);
+
+      // Update number labels to always face camera and remain upright relative to screen
+
+      // Since camera is fixed and sphere rotates, we need to account for sphere rotation
+
+      // Only update matrices once per frame, not per label
+
+      tileGroup.updateMatrixWorld();
+
+      // Get parent rotation once and invert it
+
+      const tileGroupWorldQuaternion = new THREE.Quaternion();
+
+      tileGroup.getWorldQuaternion(tileGroupWorldQuaternion);
+
+      const parentInverseQuat = tileGroupWorldQuaternion.clone().invert();
+
+      // Pre-calculate camera direction in world space (it's constant)
+
+      const cameraPos = camera.position;
+
+      const cameraUpWorld = camera.up;
+
+      state.tiles.forEach(t => {
+
+        if (t.label) {
+
+          // Get world position of label (accounting for sphere rotation)
+
+          const worldPos = new THREE.Vector3();
+
+          t.label.getWorldPosition(worldPos);
+
+          // Direction from label to camera (in world space)
+
+          const dirToCamera = new THREE.Vector3().subVectors(cameraPos, worldPos).normalize();
+
+          // Camera's up vector in world space (this is our reference for "up" relative to screen)
+
+          const cameraUp = cameraUpWorld;
+
+          // Calculate right vector (perpendicular to camera direction and camera up)
+
+          let right = new THREE.Vector3().crossVectors(cameraUp, dirToCamera);
+
+          // Handle edge case where cameraUp and dirToCamera are parallel
+
+          if (right.lengthSq() < 0.01) {
+
+            right.set(1, 0, 0);
+
+            right.crossVectors(right, dirToCamera);
+
+            if (right.lengthSq() < 0.01) {
+
+              right.set(0, 0, 1);
+
+              right.crossVectors(right, dirToCamera);
+
+            }
+
+          }
+
+          right.normalize();
+
+          // Calculate up vector (perpendicular to right and camera direction)
+
+          const up = new THREE.Vector3().crossVectors(dirToCamera, right).normalize();
+
+          // Convert camera up to local space for proper orientation
+
+          const cameraUpLocal = cameraUp.clone().applyQuaternion(parentInverseQuat);
+
+          // Convert direction to local space
+
+          const dirToCameraLocal = dirToCamera.clone().applyQuaternion(parentInverseQuat);
+
+          dirToCameraLocal.normalize();
+
+          // Calculate right and up in local space
+
+          const cameraUpLocalNorm = cameraUpLocal.normalize();
+
+          let rightLocal = new THREE.Vector3().crossVectors(cameraUpLocalNorm, dirToCameraLocal);
+
+          if (rightLocal.lengthSq() < 0.01) {
+
+            rightLocal.set(1, 0, 0);
+
+            rightLocal.crossVectors(rightLocal, dirToCameraLocal);
+
+            if (rightLocal.lengthSq() < 0.01) {
+
+              rightLocal.set(0, 0, 1);
+
+              rightLocal.crossVectors(rightLocal, dirToCameraLocal);
+
+            }
+
+          }
+
+          rightLocal.normalize();
+
+          const upLocal = new THREE.Vector3().crossVectors(dirToCameraLocal, rightLocal).normalize();
+
+          // Build local rotation matrix
+
+          const localMatrix = new THREE.Matrix4();
+
+          localMatrix.makeBasis(rightLocal, upLocal, dirToCameraLocal);
+
+          t.label.setRotationFromMatrix(localMatrix)
+
+          // Apply rotation offsets from debug panel (in local space after billboard)
+
+          if (debugConfig.numberRotation !== 0) {
+
+            // Rotate around forward axis (local Z which points at camera)
+
+            const forwardAxis = new THREE.Vector3(0, 0, 1);
+
+            forwardAxis.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(forwardAxis, debugConfig.numberRotation * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationX !== 0) {
+
+            const localAxisX = new THREE.Vector3(1, 0, 0);
+
+            localAxisX.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisX.normalize(), debugConfig.numberRotationX * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationY !== 0) {
+
+            const localAxisY = new THREE.Vector3(0, 1, 0);
+
+            localAxisY.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisY.normalize(), debugConfig.numberRotationY * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationZ !== 0) {
+
+            const localAxisZ = new THREE.Vector3(0, 0, 1);
+
+            localAxisZ.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisZ.normalize(), debugConfig.numberRotationZ * (Math.PI / 180));
+
+          }
+
+        }
+
+      });
+
+      // Camera is fixed, sphere rotates instead
+
+      renderer.render(scene, camera);
+
+      frameCount++;
+
+      const now = performance.now();
+
+      const delta = now - lastTime;
+
+      if (delta >= 1000){
+
+        fps = Math.round((frameCount * 1000) / delta);
+
+        document.getElementById('fps').textContent = `FPS: ${fps}`;
+
+        frameCount = 0;
+
+        lastTime = now;
+
+      }
+
+    });
+
+  </script>
+
+</body>
+
+</html>
+
