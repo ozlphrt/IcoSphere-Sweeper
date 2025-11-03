@@ -539,9 +539,9 @@
 
     // Positioned to create natural highlights visible from camera's initial view
 
-    const keyLight = new THREE.DirectionalLight(0xfff8e1, 3.5);
+    const keyLight = new THREE.DirectionalLight(0xfff8e1, 4);
 
-    keyLight.position.set(2.5, 3.5, 2.0);
+    keyLight.position.set(7.9, 6.1, -0.4);
 
     keyLight.castShadow = false;
 
@@ -551,9 +551,9 @@
 
     // Creates subtle edge highlights for depth separation
 
-    const rimLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    const rimLight = new THREE.DirectionalLight(0x272743, 5);
 
-    rimLight.position.set(-2.0, 1.5, -2.5);
+    rimLight.position.set(-10, -0.8, 0.3);
 
     scene.add(rimLight);
 
@@ -561,7 +561,7 @@
 
     // Provides base illumination without direction
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    const ambientLight = new THREE.AmbientLight(0x786e93, 1.8);
 
     scene.add(ambientLight);
 
@@ -659,31 +659,31 @@
 
       keyLightColor: '#fff8e1',
 
-      keyLightIntensity: 2.6,
+      keyLightIntensity: 4,
 
-      keyLightX: 5,
+      keyLightX: 7.9,
 
-      keyLightY: 4.8,
+      keyLightY: 6.1,
 
-      keyLightZ: 0.5,
+      keyLightZ: -0.4,
 
-      keyLightHarshness: 0,
+      keyLightHarshness: 1,
 
       rimLightColor: '#272743',
 
       rimLightIntensity: 5,
 
-      rimLightX: -5.300000000000001,
+      rimLightX: -10,
 
-      rimLightY: 0.1,
+      rimLightY: -0.8,
 
-      rimLightZ: -2.6,
+      rimLightZ: 0.3,
 
-      rimLightHarshness: 0,
+      rimLightHarshness: 1,
 
-      ambientLightColor: '#d1c7f5',
+      ambientLightColor: '#786e93',
 
-      ambientLightIntensity: 1.5,
+      ambientLightIntensity: 1.8,
 
       emptyTileRatio: 35,
 
