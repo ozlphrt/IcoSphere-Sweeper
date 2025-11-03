@@ -657,7 +657,9 @@
 
       emptyTileRatio: 35,
 
-      initialRevealPercent: 10
+      initialRevealPercent: 10,
+
+      backgroundColor: '#0a2a1a'
 
     };
 
@@ -2058,6 +2060,8 @@
       f4.addColor(debugConfig, 'numberColor').name('Color').onChange(()=>{ updateLabels(); });
 
       const f5 = gui.addFolder('Camera');
+
+      f5.addColor(debugConfig, 'backgroundColor').name('Background').onChange(()=>{ scene.background.set(debugConfig.backgroundColor); });
 
       f5.add(debugConfig, 'cameraFOV', 10, 120, 1).name('FOV').onChange(()=>{ updateCamera(); });
 
