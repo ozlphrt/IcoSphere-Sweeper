@@ -398,9 +398,16 @@
 
       ctx.font = `700 ${fontSize}px system-ui, Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
+      // Add subtle glow effect
+      ctx.shadowColor = debugConfig.numberColor;
+      ctx.shadowBlur = Math.max(4, Math.round(fontSize / 20));
+      
       ctx.fillStyle = debugConfig.numberColor;
 
       ctx.fillText(String(n), size/2, size/2);
+      
+      // Reset shadow for other drawing operations
+      ctx.shadowBlur = 0;
 
       const tex = new THREE.CanvasTexture(canvas); tex.anisotropy = 4; tex.needsUpdate = true;
 
@@ -1294,9 +1301,16 @@
 
           ctx.font = `700 ${fontSize}px system-ui, Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
+          // Add subtle glow effect
+          ctx.shadowColor = debugConfig.numberColor;
+          ctx.shadowBlur = Math.max(4, Math.round(fontSize / 20));
+          
           ctx.fillStyle = debugConfig.numberColor;
 
           ctx.fillText(String(n), canvas.width/2, canvas.height/2);
+          
+          // Reset shadow for other drawing operations
+          ctx.shadowBlur = 0;
 
           texture.needsUpdate = true;
 
