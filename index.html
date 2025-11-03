@@ -12,7 +12,7 @@
 
   <style>
 
-    html, body { height: 100%; margin: 0; background: #0a0f1a; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    html, body { height: 100%; margin: 0; background: #121911; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
     #app { position: fixed; inset: 0; }
 
@@ -505,10 +505,10 @@
 
     const app = document.getElementById('app');
 
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0f1a);
-    scene.fog = new THREE.Fog(new THREE.Color(0x0a0f1a), 4.0, 8.0);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x121911);
+    scene.fog = new THREE.Fog(new THREE.Color(0x121911), 2.9, 4.5);
 
-    const camera = new THREE.PerspectiveCamera(34, innerWidth/innerHeight, 0.01, 100); camera.position.set(0, 0, 2.8);
+    const camera = new THREE.PerspectiveCamera(34, innerWidth/innerHeight, 0.432, 230); camera.position.set(0, 0, 2.8);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); app.appendChild(renderer.domElement);
 
@@ -637,9 +637,9 @@
 
       cameraZ: 2.8,
 
-      cameraNear: 0.01,
+      cameraNear: 0.432,
 
-      cameraFar: 100,
+      cameraFar: 230,
 
       soundEnabled: true,
 
@@ -689,13 +689,13 @@
 
       initialRevealPercent: 10,
 
-      backgroundColor: '#0a0f1a',
+      backgroundColor: '#121911',
 
       fogEnabled: true,
 
-      fogNear: 4.0,
+      fogNear: 2.9,
 
-      fogFar: 8.0
+      fogFar: 4.5
 
     };
 
@@ -2385,7 +2385,7 @@
 
           numberColor: '#8aaadd',
 
-          backgroundColor: '#0a0f1a'
+          backgroundColor: '#121911'
 
         },
 
