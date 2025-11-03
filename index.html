@@ -12,7 +12,7 @@
 
   <style>
 
-    html, body { height: 100%; margin: 0; background: #0a2a1a; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    html, body { height: 100%; margin: 0; background: #0a0f1a; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
     #app { position: fixed; inset: 0; }
 
@@ -494,7 +494,7 @@
 
     const app = document.getElementById('app');
 
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a2a1a);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0f1a);
 
     const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.01, 100); camera.position.set(0, 0, 2.8);
 
@@ -571,17 +571,17 @@
 
       immortalMode: true,
 
-      wireHexColor: '#1a2a3a',
+      wireHexColor: '#434343',
 
-      wirePentColor: '#142030',
+      wirePentColor: '#434343',
 
-      hiddenColor: '#1a2a3a',
+      hiddenColor: '#434343',
 
-      revealedColor: '#3a4a5a',
+      revealedColor: '#2e3659',
 
-      flagColor: '#8a5a9a',
+      flagColor: '#632676',
 
-      mineColor: '#4a3a5a',
+      mineColor: '#ff0000',
 
       mineEmissive: '#202050',
 
@@ -597,7 +597,7 @@
 
       numberScale: 0.8,
 
-      numberColor: '#ccddff',
+      numberColor: '#8aaadd',
 
       cameraFOV: 37.49999998013179,
 
@@ -615,9 +615,9 @@
 
       soundVolume: 0.5,
 
-      revealSoundIndex: 0,
+      revealSoundIndex: 3,
 
-      flagSoundIndex: 0,
+      flagSoundIndex: 5,
 
       gameOverSoundIndex: 0,
 
@@ -659,7 +659,7 @@
 
       initialRevealPercent: 10,
 
-      backgroundColor: '#0a2a1a'
+      backgroundColor: '#0a0f1a'
 
     };
 
@@ -703,7 +703,7 @@
 
     }
 
-    function generateBeep(frequency, duration, type = 'reveal'){
+    function generateBeep(frequency, duration, type = 'reveal', variant = 0){
 
       if (!audioContext) initAudio();
 
@@ -715,44 +715,69 @@
 
       gainNode.connect(audioContext.destination);
 
-      if (type === 'reveal'){
+      if (type === 'reveal' || type === 'flag'){
 
-        oscillator.frequency.value = frequency;
+        // Clean, pleasant click sounds with 5 variants for both reveal and flagging
+        const clickVariants = [
+          { freq: 800, dur: 0.015, vol: 0.3, type: 'sine' },
+          { freq: 1000, dur: 0.012, vol: 0.35, type: 'sine' },
+          { freq: 1200, dur: 0.01, vol: 0.32, type: 'triangle' },
+          { freq: 600, dur: 0.018, vol: 0.28, type: 'sine' },
+          { freq: 900, dur: 0.014, vol: 0.33, type: 'triangle' }
+        ];
 
-        oscillator.type = 'sine';
+        const v = clickVariants[variant] || clickVariants[0];
 
+        // Small random variation
+        oscillator.frequency.value = v.freq + Math.random() * 100 - 50;
+
+        oscillator.type = v.type;
+
+        // Soft attack and decay for pleasant sound
         gainNode.gain.setValueAtTime(0, audioContext.currentTime);
 
-        gainNode.gain.linearRampToValueAtTime(debugConfig.soundVolume * 0.3, audioContext.currentTime + 0.01);
+        gainNode.gain.linearRampToValueAtTime(debugConfig.soundVolume * v.vol, audioContext.currentTime + 0.002);
 
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + v.dur);
 
-      } else if (type === 'flag'){
+        oscillator.start(audioContext.currentTime);
 
-        oscillator.frequency.value = frequency;
+        oscillator.stop(audioContext.currentTime + v.dur);
 
-        oscillator.type = 'square';
-
-        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-
-        gainNode.gain.linearRampToValueAtTime(debugConfig.soundVolume * 0.2, audioContext.currentTime + 0.01);
-
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+        return;
 
       } else if (type === 'gameOver'){
 
-        oscillator.frequency.value = frequency;
+        // Game over sounds with 5 different variants
+        const gameOverVariants = [
+          { freq: 200, dur: 0.5, vol: 0.4 },
+          { freq: 150, dur: 0.6, vol: 0.35 },
+          { freq: 250, dur: 0.4, vol: 0.45 },
+          { freq: 180, dur: 0.7, vol: 0.38 },
+          { freq: 220, dur: 0.5, vol: 0.42 }
+        ];
+
+        const v = gameOverVariants[variant] || gameOverVariants[0];
+
+        oscillator.frequency.value = v.freq;
 
         oscillator.type = 'sawtooth';
 
-        gainNode.gain.setValueAtTime(debugConfig.soundVolume * 0.4, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(debugConfig.soundVolume * v.vol, audioContext.currentTime);
 
-        oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.3, audioContext.currentTime + duration);
+        oscillator.frequency.exponentialRampToValueAtTime(v.freq * 0.3, audioContext.currentTime + v.dur);
 
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + v.dur);
+
+        oscillator.start(audioContext.currentTime);
+
+        oscillator.stop(audioContext.currentTime + v.dur);
+
+        return;
 
       }
 
+      // Fallback
       oscillator.start(audioContext.currentTime);
 
       oscillator.stop(audioContext.currentTime + duration);
@@ -763,115 +788,32 @@
 
       if (!debugConfig.soundEnabled || !audioContext) return;
 
-      const volume = debugConfig.soundVolume;
-
-      let buffer = null;
-
       if (type === 'reveal'){
 
-        if (debugConfig.revealSoundIndex === 0){
+        // Always use synthesized click variants (0-5)
+        const variant = debugConfig.revealSoundIndex - 1;
 
-          generateBeep(800, 0.1, 'reveal');
+        generateBeep(1000, 0.02, 'reveal', variant);
 
-          return;
-
-        }
-
-        buffer = soundBuffers.reveal && soundBuffers.reveal[debugConfig.revealSoundIndex - 1];
-
-        if (!buffer){
-
-          generateBeep(800, 0.1, 'reveal');
-
-          return;
-
-        }
+        return;
 
       } else if (type === 'flag'){
 
-        if (debugConfig.flagSoundIndex === 0){
+        // Always use synthesized flag variants (0-5)
+        const variant = debugConfig.flagSoundIndex - 1;
 
-          generateBeep(600, 0.08, 'flag');
+        generateBeep(600, 0.08, 'flag', variant);
 
-          return;
-
-        }
-
-        buffer = soundBuffers.flag && soundBuffers.flag[debugConfig.flagSoundIndex - 1];
-
-        if (!buffer){
-
-          generateBeep(600, 0.08, 'flag');
-
-          return;
-
-        }
+        return;
 
       } else if (type === 'gameOver'){
 
-        if (debugConfig.gameOverSoundIndex === 0){
+        // Always use synthesized game over variants (0-5)
+        const variant = debugConfig.gameOverSoundIndex - 1;
 
-          generateBeep(200, 0.5, 'gameOver');
+        generateBeep(200, 0.5, 'gameOver', variant);
 
-          return;
-
-        }
-
-        buffer = soundBuffers.gameOver && soundBuffers.gameOver[debugConfig.gameOverSoundIndex - 1];
-
-        if (!buffer){
-
-          generateBeep(200, 0.5, 'gameOver');
-
-          return;
-
-        }
-
-      }
-
-      if (buffer){
-
-        try {
-
-          const source = audioContext.createBufferSource();
-
-          const gainNode = audioContext.createGain();
-
-          source.buffer = buffer;
-
-          source.connect(gainNode);
-
-          gainNode.connect(audioContext.destination);
-
-          let duration = buffer.duration;
-
-          if (type === 'reveal' || type === 'flag'){
-
-            duration = Math.min(duration, 0.1);
-
-            gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
-
-          } else {
-
-            gainNode.gain.value = volume;
-
-          }
-
-          source.start(0);
-
-          if (type === 'reveal' || type === 'flag'){
-
-            source.stop(audioContext.currentTime + duration);
-
-          }
-
-        } catch (e){
-
-          console.error('Error playing sound:', e);
-
-        }
+        return;
 
       }
 
@@ -1109,7 +1051,7 @@
 
       checkWin(); updateCounters();
 
-      // If this tile has count 0, recursively reveal adjacent safe tiles
+      // If this tile has count 0, add adjacent safe tiles to reveal queue for one-by-one processing
 
       if (t.count === 0) {
 
@@ -1119,7 +1061,12 @@
 
           if (!neighbor.revealed && !neighbor.flagged && !neighbor.isEmpty && !neighbor.mine) {
 
-            revealSingle(nb);
+            // Add to queue instead of recursive call
+            if (!revealQueue.includes(nb)) {
+
+              revealQueue.push(nb);
+
+            }
 
           }
 
@@ -1183,7 +1130,12 @@
 
         }
 
-        setTimeout(revealNext, 8);
+        // Initial reveal should happen all at once (no delay)
+        if (isInitialReveal) {
+          revealNext();
+        } else {
+          setTimeout(revealNext, 8);
+        }
 
       }
 
@@ -1405,17 +1357,15 @@
 
       if (!t.flagged) return;
 
-      const heat = calculateFlagHeat(i);
-
-      const heatColor = getFlagColorFromHeat(heat);
+      // Use standard flag color without heatmap
 
       if (!t.flagMaterial){
 
-        t.flagMaterial = new THREE.MeshStandardMaterial({ color: heatColor, roughness: matFlag.roughness, metalness: matFlag.metalness });
+        t.flagMaterial = new THREE.MeshStandardMaterial({ color: debugConfig.flagColor, roughness: matFlag.roughness, metalness: matFlag.metalness });
 
       } else {
 
-        t.flagMaterial.color.set(heatColor);
+        t.flagMaterial.color.set(debugConfig.flagColor);
 
       }
 
@@ -2145,6 +2095,11 @@
 
         updateLabels();
 
+        // Update background color
+        if (preset.backgroundColor) {
+          scene.background.set(preset.backgroundColor);
+        }
+
       };
 
       const palettes = {
@@ -2341,17 +2296,39 @@
 
           flagColor: '#8a5a9a',
 
-          mineColor: '#4a3a5a',
+          mineColor: '#ff0000',
 
           mineEmissive: '#202050',
 
           numberColor: '#ccddff'
 
+        },
+
+        'Blue': {
+
+          wireHexColor: '#434343',
+
+          wirePentColor: '#434343',
+
+          hiddenColor: '#434343',
+
+          revealedColor: '#2e3659',
+
+          flagColor: '#632676',
+
+          mineColor: '#ff0000',
+
+          mineEmissive: '#202050',
+
+          numberColor: '#8aaadd',
+
+          backgroundColor: '#0a0f1a'
+
         }
 
       };
 
-      const paletteController = gui.add({ preset: 'Crystal' }, 'preset', Object.keys(palettes)).name('Color Palette').onChange((name) => {
+      const paletteController = gui.add({ preset: 'Blue' }, 'preset', Object.keys(palettes)).name('Color Palette').onChange((name) => {
 
         applyPalette(palettes[name]);
 
@@ -2395,6 +2372,9 @@
 
       gui.add({ copyConfig }, 'copyConfig').name('Copy Config to Clipboard');
 
+      // Apply Blue palette at startup
+      applyPalette(palettes['Blue']);
+
       guiVisible = true;
 
       gui.domElement.style.display = 'block';
@@ -2432,6 +2412,10 @@
     // Apply initial light settings from debugConfig
 
     updateLights();
+
+    // Initialize and show debug panel by default
+
+    initGUI();
 
     rebuildCore(debugConfig.tileDensity); runTests();
 
