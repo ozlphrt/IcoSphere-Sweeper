@@ -120,11 +120,15 @@
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
 
-
+  <script type="module">
+    import { EffectComposer } from 'https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/postprocessing/RenderPass.js';
+    import { BokehPass } from 'https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/postprocessing/BokehPass.js';
+    
+    window.postprocessing = { EffectComposer, RenderPass, BokehPass };
+  </script>
 
   <script>
 
@@ -507,6 +511,22 @@
     const camera = new THREE.PerspectiveCamera(34, innerWidth/innerHeight, 0.01, 100); camera.position.set(0, 0, 2.8);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); app.appendChild(renderer.domElement);
+
+    // Post-processing setup
+    let composer = null;
+    if (window.postprocessing) {
+      const { EffectComposer, RenderPass, BokehPass } = window.postprocessing;
+      composer = new EffectComposer(renderer);
+      const renderPass = new RenderPass(scene, camera);
+      composer.addPass(renderPass);
+      
+      const bokehPass = new BokehPass(scene, camera, {
+        focus: 2.8,
+        aperture: 0.015,
+        maxblur: 0.005
+      });
+      composer.addPass(bokehPass);
+    }
 
     // Camera is fixed, sphere will rotate instead
     // const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
@@ -2544,7 +2564,7 @@
 
     rebuildCore(debugConfig.tileDensity); runTests();
 
-    addEventListener('resize', ()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+    addEventListener('resize', ()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); if (composer) composer.setSize(innerWidth, innerHeight); });
 
     let lastTime = performance.now();
 
@@ -2734,7 +2754,11 @@
 
       // Camera is fixed, sphere rotates instead
 
-      renderer.render(scene, camera);
+      if (composer) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
 
       frameCount++;
 
