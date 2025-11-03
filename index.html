@@ -667,13 +667,13 @@
 
     // ===== Minesweeper state & materials =====
 
-    const matHidden = new THREE.MeshStandardMaterial({ color: debugConfig.hiddenColor, roughness: 0.95, metalness: 0.05 });
+    const matHidden = new THREE.MeshStandardMaterial({ color: debugConfig.hiddenColor, roughness: 0.95, metalness: 0.05, side: THREE.DoubleSide });
 
-    const matRevealed = new THREE.MeshStandardMaterial({ color: debugConfig.revealedColor, roughness: 0.2, metalness: 0.15 });
+    const matRevealed = new THREE.MeshStandardMaterial({ color: debugConfig.revealedColor, roughness: 0.2, metalness: 0.15, side: THREE.DoubleSide });
 
-    const matFlag = new THREE.MeshStandardMaterial({ color: debugConfig.flagColor, roughness: 0.6, metalness: 0.05 });
+    const matFlag = new THREE.MeshStandardMaterial({ color: debugConfig.flagColor, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide });
 
-    const matMine = new THREE.MeshStandardMaterial({ color: debugConfig.mineColor, emissive: debugConfig.mineEmissive, roughness: 0.6 });
+    const matMine = new THREE.MeshStandardMaterial({ color: debugConfig.mineColor, emissive: debugConfig.mineEmissive, roughness: 0.6, side: THREE.DoubleSide });
 
     const matEmpty = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0, roughness: 0.95, metalness: 0.05 });
 
