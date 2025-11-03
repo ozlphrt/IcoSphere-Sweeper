@@ -1082,7 +1082,6 @@
       if (!isInitialReveal) {
 
         playSound('reveal');
-        createParticleBurst(t.center, debugConfig.revealedColor);
 
       }
 
@@ -1464,7 +1463,6 @@
       state.flags += t.flagged ? 1 : -1; 
 
       playSound('flag'); 
-      createParticleBurst(t.center, debugConfig.flagColor);
 
       updateCounters(); 
 
@@ -1601,82 +1599,6 @@
       } else if (debugConfig.fogEnabled && !scene.fog) {
         scene.fog = new THREE.Fog(new THREE.Color(debugConfig.backgroundColor), debugConfig.fogNear, debugConfig.fogFar);
       }
-    }
-
-    function createParticleBurst(position, color, count = 12){
-      const positions = [];
-      const velocities = [];
-      const sizes = [];
-      const lifetimes = [];
-
-      for (let i = 0; i < count; i++) {
-        // Start at tile position
-        positions.push(position.x, position.y, position.z);
-        
-        // Random outward velocity
-        const angle1 = Math.random() * Math.PI * 2;
-        const angle2 = Math.random() * Math.PI;
-        const speed = 0.08 + Math.random() * 0.15;
-        velocities.push(
-          Math.sin(angle2) * Math.cos(angle1) * speed,
-          Math.sin(angle2) * Math.sin(angle1) * speed,
-          Math.cos(angle2) * speed
-        );
-        
-        sizes.push(0.02 + Math.random() * 0.02);
-        lifetimes.push(0);
-      }
-
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-
-      const material = new THREE.PointsMaterial({
-        color: color,
-        size: 0.06,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 1
-      });
-
-      const points = new THREE.Points(geometry, material);
-      points.userData = { velocities, sizes, lifetimes };
-      particleGroup.add(points);
-
-      // Animate and remove after duration
-      const startTime = performance.now();
-      const duration = 500;
-      
-      function animateParticles() {
-        const elapsed = performance.now() - startTime;
-        if (elapsed > duration) {
-          particleGroup.remove(points);
-          geometry.dispose();
-          material.dispose();
-          return;
-        }
-
-        const positions = geometry.attributes.position.array;
-        const vel = points.userData.velocities;
-        const lifetimes = points.userData.lifetimes;
-        
-        for (let i = 0; i < positions.length; i += 3) {
-          positions[i] += vel[i];
-          positions[i + 1] += vel[i + 1];
-          positions[i + 2] += vel[i + 2];
-          vel[i] *= 0.95;
-          vel[i + 1] *= 0.95;
-          vel[i + 2] *= 0.95;
-        }
-        
-        geometry.attributes.position.needsUpdate = true;
-        
-        const progress = elapsed / duration;
-        material.opacity = 1 - progress;
-        
-        requestAnimationFrame(animateParticles);
-      }
-      
-      requestAnimationFrame(animateParticles);
     }
 
     function updateLights(){
@@ -2464,6 +2386,206 @@
           numberColor: '#8aaadd',
 
           backgroundColor: '#0a0f1a'
+
+        },
+
+        'Lava': {
+
+          wireHexColor: '#2a0a0a',
+
+          wirePentColor: '#1f0707',
+
+          hiddenColor: '#3d1a1a',
+
+          revealedColor: '#5a1a1a',
+
+          flagColor: '#7a3a2a',
+
+          mineColor: '#ff4d00',
+
+          mineEmissive: '#ff0000',
+
+          numberColor: '#ffaa66'
+
+        },
+
+        'Jungle': {
+
+          wireHexColor: '#0a1a0a',
+
+          wirePentColor: '#07140a',
+
+          hiddenColor: '#1a251a',
+
+          revealedColor: '#1a3a1a',
+
+          flagColor: '#4a6a2a',
+
+          mineColor: '#3a1a1a',
+
+          mineEmissive: '#200808',
+
+          numberColor: '#6faa6a'
+
+        },
+
+        'Mars': {
+
+          wireHexColor: '#3a1a0a',
+
+          wirePentColor: '#2e1408',
+
+          hiddenColor: '#4a2a1a',
+
+          revealedColor: '#5a2a1a',
+
+          flagColor: '#6a3a2a',
+
+          mineColor: '#7a3a3a',
+
+          mineEmissive: '#501010',
+
+          numberColor: '#cc9966'
+
+        },
+
+        'Neon': {
+
+          wireHexColor: '#0a0a1a',
+
+          wirePentColor: '#070714',
+
+          hiddenColor: '#1a1a2a',
+
+          revealedColor: '#2a1a3a',
+
+          flagColor: '#5a2a7a',
+
+          mineColor: '#3a1a5a',
+
+          mineEmissive: '#200050',
+
+          numberColor: '#00ffaa'
+
+        },
+
+        'Mint': {
+
+          wireHexColor: '#1a2a1a',
+
+          wirePentColor: '#142014',
+
+          hiddenColor: '#1d2a1d',
+
+          revealedColor: '#2a3a2a',
+
+          flagColor: '#5a7a5a',
+
+          mineColor: '#3a4a3a',
+
+          mineEmissive: '#103010',
+
+          numberColor: '#aaffaa'
+
+        },
+
+        'Purple': {
+
+          wireHexColor: '#2a1a3a',
+
+          wirePentColor: '#1f1429',
+
+          hiddenColor: '#3a2a4a',
+
+          revealedColor: '#4a3a5a',
+
+          flagColor: '#6a4a7a',
+
+          mineColor: '#5a2a6a',
+
+          mineEmissive: '#300050',
+
+          numberColor: '#cc88ff'
+
+        },
+
+        'Gold': {
+
+          wireHexColor: '#2a1a0a',
+
+          wirePentColor: '#1f1407',
+
+          hiddenColor: '#3a2a1a',
+
+          revealedColor: '#5a4a2a',
+
+          flagColor: '#7a6a3a',
+
+          mineColor: '#6a5a2a',
+
+          mineEmissive: '#403000',
+
+          numberColor: '#ffcc66'
+
+        },
+
+        'Shadow': {
+
+          wireHexColor: '#000000',
+
+          wirePentColor: '#000000',
+
+          hiddenColor: '#0a0a0a',
+
+          revealedColor: '#1a1a1a',
+
+          flagColor: '#2a2a2a',
+
+          mineColor: '#3a0a0a',
+
+          mineEmissive: '#500000',
+
+          numberColor: '#888888'
+
+        },
+
+        'Crimson': {
+
+          wireHexColor: '#1a0a0a',
+
+          wirePentColor: '#140707',
+
+          hiddenColor: '#2a0a0a',
+
+          revealedColor: '#3a1a1a',
+
+          flagColor: '#5a2a2a',
+
+          mineColor: '#8a0a0a',
+
+          mineEmissive: '#ff0000',
+
+          numberColor: '#ff6666'
+
+        },
+
+        'Aurora': {
+
+          wireHexColor: '#0a1a2a',
+
+          wirePentColor: '#071421',
+
+          hiddenColor: '#1a2a3a',
+
+          revealedColor: '#2a3a4a',
+
+          flagColor: '#4a5a6a',
+
+          mineColor: '#3a4a5a',
+
+          mineEmissive: '#001020',
+
+          numberColor: '#66aaff'
 
         }
 
