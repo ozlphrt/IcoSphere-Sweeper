@@ -1648,6 +1648,9 @@
       // Rim light harshness affects rim light intensity (how much rim light contributes)
       // Harshness 0 = 70% intensity (softer), Harshness 1 = 100% intensity (reduced range for less dramatic effect)
       rimLight.intensity = debugConfig.rimLightIntensity * (0.7 + debugConfig.rimLightHarshness * 0.3);
+      
+      // Slightly boost rim light for better silhouette contrast
+      rimLight.intensity *= 1.2;
 
     }
 
