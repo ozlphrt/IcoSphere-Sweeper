@@ -1045,7 +1045,7 @@
 
       const total = state.tiles.length; const mineTarget = Math.max(1, Math.floor(total * ratioPercent/100));
 
-      state.totalMines = mineTarget; state.flags = 0; state.safeRevealed = 0; state.gameOver=false; updateCounters();
+      state.totalMines = mineTarget; state.flags = 0; state.safeRevealed = 0; state.gameOver=false; state.lives = 3; updateCounters(); updateLives();
 
       state.tiles.forEach(t=>{ t.mine=false; t.count=0; t.flagged=false; t.revealed=false; if (t.label){ tileGroup.remove(t.label); t.label.material.map.dispose(); t.label.material.dispose(); t.label=null; } if (t.flagMaterial){ t.flagMaterial.dispose(); t.flagMaterial=null; } t.mesh.material = t.isEmpty ? matEmpty : matHidden; });
 
@@ -1524,7 +1524,41 @@
 
 
 
-    function gameLost(){ state.gameOver = true; playSound('gameOver'); state.tiles.forEach((t)=>{ if (t.mine){ t.mesh.material = matMine; if (!t.revealed) { t.revealed = true; } } }); }
+    function gameLost(){ 
+      if (debugConfig.immortalMode) return;
+      
+      state.lives--;
+      updateLives();
+      
+      if (state.lives <= 0) {
+        state.gameOver = true;
+        playSound('gameOver');
+        state.tiles.forEach((t)=>{ 
+          if (t.mine){ 
+            t.mesh.material = matMine; 
+            if (!t.revealed) { 
+              t.revealed = true; 
+            } 
+          } 
+        });
+      } else {
+        // Just reveal the mine that was hit, but don't end the game
+        playSound('gameOver');
+      }
+    }
+    
+    function updateLives(){
+      for (let i = 1; i <= 3; i++) {
+        const heart = document.getElementById(`heart${i}`);
+        if (heart) {
+          if (i <= state.lives) {
+            heart.classList.remove('empty');
+          } else {
+            heart.classList.add('empty');
+          }
+        }
+      }
+    }
 
 
 
@@ -1737,7 +1771,7 @@
 
       state.polys = buildDualPolygons(geo.verts, geo.faces); state.neighbors = buildAdjacency(state.polys);
 
-      buildTiles(); state.firstClick = true; state.gameOver=false; state.safeRevealed=0; state.totalMines=0; state.flags=0; updateCounters(); spherePivot.position.set(0, 0, 0); targetPosition.set(0, 0, 0); spherePosition.set(0, 0, 0); sphereQuaternion.set(0, 0, 0, 1); targetQuaternion.set(0, 0, 0, 1);
+      buildTiles(); state.firstClick = true; state.gameOver=false; state.safeRevealed=0; state.totalMines=0; state.flags=0; state.lives=3; updateCounters(); updateLives(); spherePivot.position.set(0, 0, 0); targetPosition.set(0, 0, 0); spherePosition.set(0, 0, 0); sphereQuaternion.set(0, 0, 0, 1); targetQuaternion.set(0, 0, 0, 1);
       
       // Place mines and reveal initial tiles automatically
       placeMines(-1, debugConfig.mineRatio); state.firstClick = false;
