@@ -3324,7 +3324,7 @@
     let touchFlagTime = 0; // Track when touch flagging occurred
     const DOUBLE_TAP_DELAY = 150; // ms between taps (reduced for better responsiveness)
     const DOUBLE_TAP_DISTANCE = 50; // pixels max distance
-    const TAP_MAX_DURATION = 200; // ms - taps longer than this are considered holds (reveal)
+    const TAP_MAX_DURATION = 300; // ms - taps longer than this are considered holds (flag)
     const TAP_MAX_MOVEMENT = 5; // pixels - movement beyond this is considered a drag (rotation)
     let pendingReveal = null; // Track pending reveal (not used with new behavior but kept for compatibility)
 
@@ -3453,13 +3453,13 @@
             // Vibrate if supported for feedback
             if (navigator.vibrate) navigator.vibrate(20);
           } else {
-            // SWAPPED: Simple tap (flags) vs hold (reveals)
+            // Tap = reveal, Hold = flag
             // If touch moved, it was a rotation/drag - do nothing
-            // If held too long (long duration) and no movement = reveal
-            // Simple tap (short duration, no movement) = flag
+            // Simple tap (short duration, no movement) = reveal
+            // Long hold (long duration, no movement) = flag
             if (!wasDragging && !touchMoved) {
-              if (touchDuration > TAP_MAX_DURATION) {
-                // Long hold (no movement) = reveal
+              if (touchDuration <= TAP_MAX_DURATION) {
+                // Simple tap (short duration, no movement) = reveal
                 const fakeEvent = { clientX: touchStartPos.x, clientY: touchStartPos.y };
                 const idx = pickTile(fakeEvent);
                 
@@ -3471,7 +3471,7 @@
                     doubleTapTimer = null;
                   }
                   
-                  // Reveal on hold
+                  // Reveal on tap
                   if (state.firstClick) {
                     placeMines(idx, debugConfig.mineRatio);
                     state.firstClick = false;
@@ -3482,7 +3482,7 @@
                   if (navigator.vibrate) navigator.vibrate(30);
                 }
               } else {
-                // Simple tap with no movement and short duration = flag
+                // Long hold (no movement, long duration) = flag
                 lastTapPos = { x: touchStartPos.x, y: touchStartPos.y };
                 lastTapTime = currentTime;
                 
@@ -3504,7 +3504,7 @@
                     touchFlagTime = 0;
                   }, 300); // Short timeout - only block immediate follow-up events
                   
-                  // Set up timer for potential double-tap (double tap still flags)
+                  // Set up timer for potential double-tap
                   doubleTapTimer = setTimeout(() => {
                     lastTapTime = 0;
                     lastTapPos = null;
