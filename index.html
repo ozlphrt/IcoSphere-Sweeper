@@ -38,7 +38,13 @@
 
     .fps { position: absolute; bottom: 12px; right: 12px; padding: 6px 10px; border-radius: 8px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 4px 12px rgba(0,0,0,0.35); font-size: 11px; font-variant-numeric: tabular-nums; color: #eaeef7; border: 1px solid rgba(255,255,255,0.06); }
 
-    .scoreboard { position: absolute; top: 12px; left: 12px; padding: 12px; border-radius: 12px; backdrop-filter: blur(12px); background: rgba(16,19,30,0.75); box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-width: 260px; border: 1px solid rgba(255,255,255,0.08); }
+    .scoreboard { position: absolute; top: 12px; left: 12px; padding: 12px; border-radius: 12px; backdrop-filter: blur(12px); background: rgba(16,19,30,0.75); box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-width: 260px; border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s ease; cursor: pointer; }
+    
+    .scoreboard.collapsed { gap: 8px; padding: 8px; min-width: auto; }
+    
+    .scoreboard.collapsed .score-title,
+    .scoreboard.collapsed .score-fraction,
+    .scoreboard.collapsed .scoreboard-buttons { display: none; }
 
     .score-section { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 
@@ -2159,6 +2165,40 @@
 
 
     // UI
+    
+    // Scoreboard auto-collapse after 5 seconds
+    let scoreboardCollapseTimer = null;
+    const scoreboard = document.getElementById('scoreboard');
+    
+    function resetScoreboardTimer() {
+      scoreboard.classList.remove('collapsed');
+      if (scoreboardCollapseTimer) {
+        clearTimeout(scoreboardCollapseTimer);
+      }
+      scoreboardCollapseTimer = setTimeout(() => {
+        scoreboard.classList.add('collapsed');
+      }, 5000);
+    }
+    
+    // Expand scoreboard on click/touch
+    scoreboard.addEventListener('click', (e) => {
+      // Don't expand if clicking buttons
+      if (e.target.closest('.btn-reset, .btn-sound, .btn-settings')) {
+        return;
+      }
+      resetScoreboardTimer();
+    });
+    
+    scoreboard.addEventListener('touchstart', (e) => {
+      // Don't expand if touching buttons
+      if (e.target.closest('.btn-reset, .btn-sound, .btn-settings')) {
+        return;
+      }
+      resetScoreboardTimer();
+    }, { passive: true });
+    
+    // Start the timer
+    resetScoreboardTimer();
     
     // Scoreboard button handlers
     document.getElementById('scoreboardReset').addEventListener('click', ()=>{ rebuildCore(state.f); });
