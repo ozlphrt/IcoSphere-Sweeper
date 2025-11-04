@@ -4945,25 +4945,63 @@
       const minePercent = state.totalMines > 0 ? (state.flags / state.totalMines) * 100 : 0;
       if (minePercent >= 80 && !state.gameOver) {
         // Slow pulsing animation for unrevealed tiles
-        const pulseSpeed = 0.002; // Slow pulse (adjust for speed)
+        const pulseSpeed = 0.003; // Slow pulse speed
         const time = performance.now() * pulseSpeed;
-        // Use sine wave for smooth pulsing: 0.08 (base) to 0.25 (peak)
-        const pulseIntensity = 0.08 + (Math.sin(time) * 0.5 + 0.5) * 0.17; // 0.08 to 0.25
+        const pulseFactor = (Math.sin(time) * 0.5 + 0.5); // 0 to 1
+        
+        // Use sine wave for smooth pulsing: 0.08 (base) to 1.2 (peak) - much more visible
+        const pulseIntensity = 0.08 + pulseFactor * 1.12; // 0.08 to 1.2
+        
+        // Parse base hidden color for color animation
+        const hiddenColorHex = debugConfig.hiddenColor.replace('#', '');
+        const baseR = parseInt(hiddenColorHex.substr(0, 2), 16);
+        const baseG = parseInt(hiddenColorHex.substr(2, 2), 16);
+        const baseB = parseInt(hiddenColorHex.substr(4, 2), 16);
+        
+        // Brighten the color during pulse (add white tint)
+        const brightenAmount = Math.round(pulseFactor * 60); // Add up to 60 brightness
+        const pulseR = Math.min(255, baseR + brightenAmount);
+        const pulseG = Math.min(255, baseG + brightenAmount);
+        const pulseB = Math.min(255, baseB + brightenAmount);
         
         // Animate all unrevealed, unflagged, non-empty tiles
+        // Since matHidden is shared, we need to update it directly
+        let needsUpdate = false;
         for (let i = 0; i < state.tiles.length; i++) {
           const t = state.tiles[i];
           if (!t.revealed && !t.flagged && !t.isEmpty && t.mesh.material === matHidden) {
-            t.mesh.material.emissiveIntensity = pulseIntensity;
+            needsUpdate = true;
+            break;
           }
         }
+        
+        if (needsUpdate) {
+          // Update shared material properties for all unrevealed tiles
+          matHidden.emissiveIntensity = pulseIntensity;
+          matHidden.emissive.setRGB(0x44 / 255, 0x44 / 255, 0x44 / 255); // Bright emissive
+          matHidden.color.setRGB(pulseR / 255, pulseG / 255, pulseB / 255); // Brighten base color
+        }
       } else {
-        // Reset emissive intensity for unrevealed tiles when below 80% or game over
+        // Reset properties for unrevealed tiles when below 80% or game over
+        const hiddenColorHex = debugConfig.hiddenColor.replace('#', '');
+        const baseR = parseInt(hiddenColorHex.substr(0, 2), 16);
+        const baseG = parseInt(hiddenColorHex.substr(2, 2), 16);
+        const baseB = parseInt(hiddenColorHex.substr(4, 2), 16);
+        
+        // Only reset if we have unrevealed tiles using matHidden
+        let needsReset = false;
         for (let i = 0; i < state.tiles.length; i++) {
           const t = state.tiles[i];
           if (!t.revealed && !t.flagged && !t.isEmpty && t.mesh.material === matHidden) {
-            t.mesh.material.emissiveIntensity = 0.08; // Reset to default
+            needsReset = true;
+            break;
           }
+        }
+        
+        if (needsReset) {
+          matHidden.emissiveIntensity = 0.08; // Reset to default
+          matHidden.emissive.setRGB(0x11 / 255, 0x11 / 255, 0x11 / 255); // Reset to default
+          matHidden.color.setRGB(baseR / 255, baseG / 255, baseB / 255); // Reset to default
         }
       }
 
