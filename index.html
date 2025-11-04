@@ -14,7 +14,14 @@
 
     html, body { height: 100%; margin: 0; background: #121911; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
-    #app { position: fixed; inset: 0; }
+    #app { position: fixed; inset: 0; z-index: 1; }
+    #app canvas { pointer-events: auto; }
+    
+    /* Ensure UI elements are above canvas and clickable */
+    .fps, .scoreboard, .ui, .palette-overlay, .game-over-overlay, .loading-overlay {
+      z-index: 1000 !important;
+      pointer-events: auto !important;
+    }
 
     .ui { position: absolute; top: 12px; left: 12px; padding: 12px 14px; border-radius: 14px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 8px 20px rgba(0,0,0,0.35); display: grid; gap: 10px; min-width: 320px; border: 1px solid rgba(255,255,255,0.06); }
 
@@ -36,7 +43,7 @@
 
     .bad { color: #ff8080; }
 
-    .fps { position: absolute; bottom: 12px; right: 12px; padding: 6px 10px; border-radius: 8px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 4px 12px rgba(0,0,0,0.35); font-size: 11px; font-variant-numeric: tabular-nums; color: #eaeef7; border: 1px solid rgba(255,255,255,0.06); }
+    .fps { position: absolute; bottom: 12px; right: 12px; padding: 6px 10px; border-radius: 8px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 4px 12px rgba(0,0,0,0.35); font-size: 11px; font-variant-numeric: tabular-nums; color: #eaeef7; border: 1px solid rgba(255,255,255,0.06); z-index: 100; pointer-events: auto; }
     .fps-preset { cursor: pointer; text-decoration: underline; text-decoration-color: rgba(255,255,255,0.3); transition: all 0.2s; user-select: none; }
     .fps-preset:hover { color: #9ad1ff; text-decoration-color: rgba(154,209,255,0.5); }
     .fps-preset:active { opacity: 0.7; }
@@ -2990,6 +2997,13 @@
 
     renderer.domElement.addEventListener('mousedown', (e)=>{
 
+      // Ignore mousedown on UI elements (like FPS preset label)
+      if (e.target.closest('.fps-preset') || e.target.closest('.fps') || 
+          e.target.closest('.scoreboard') || e.target.closest('.ui') ||
+          e.target.closest('.palette-overlay') || e.target.closest('.game-over-overlay')) {
+        return;
+      }
+
       if (e.button === 0) { // Left mouse button for rotation
 
         // Clear right-click tracking when a new left-click starts
@@ -3207,6 +3221,13 @@
     });
 
     renderer.domElement.addEventListener('click', (e)=>{
+
+      // Ignore clicks on UI elements (like FPS preset label)
+      if (e.target.closest('.fps-preset') || e.target.closest('.fps') || 
+          e.target.closest('.scoreboard') || e.target.closest('.ui') ||
+          e.target.closest('.palette-overlay') || e.target.closest('.game-over-overlay')) {
+        return;
+      }
 
       // CRITICAL: Block clicks ONLY if:
       // 1. This is a right-click (button === 2)
@@ -4080,7 +4101,9 @@
             fpsEl.innerHTML = `FPS: -- | <span class="fps-preset" id="fpsPreset">${presetName}</span>`;
           }
           // Re-attach click handler after innerHTML update
-          attachPresetClickHandler();
+          if (window.attachPresetClickHandler) {
+            window.attachPresetClickHandler();
+          }
         }
       };
 
@@ -4106,49 +4129,55 @@
 
       // Function to attach click/touch handlers to preset element using event delegation
       // This way handlers persist even when the DOM is updated
-      function attachPresetClickHandler() {
-        const fpsEl = document.getElementById('fps');
-        if (!fpsEl || fpsEl.dataset.handlersAttached) return;
+      // Make it globally accessible
+      window.attachPresetClickHandler = function() {
+        // Use document-level event delegation to catch clicks even if canvas is on top
+        if (window._presetClickHandlerAttached) return;
+        window._presetClickHandlerAttached = true;
         
-        fpsEl.dataset.handlersAttached = 'true';
-        
-        // Click handler (desktop) - use event delegation
-        fpsEl.addEventListener('click', (e) => {
+        // Click handler on document level to catch clicks even when canvas intercepts
+        document.addEventListener('click', (e) => {
           const presetEl = e.target.closest('.fps-preset');
           if (presetEl) {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
             if (window.cyclePreset) {
               window.cyclePreset();
+              console.log('Preset cycled via FPS label click');
+            } else {
+              console.warn('cyclePreset function not found');
             }
+            return false;
           }
-        });
+        }, true); // Use capture phase to handle before canvas handlers
 
-        // Touch handler (mobile) - use event delegation
+        // Touch handler (mobile) - use document-level delegation
         let touchStartTime = 0;
         let touchMoved = false;
         let touchTarget = null;
         
-        fpsEl.addEventListener('touchstart', (e) => {
+        document.addEventListener('touchstart', (e) => {
           const presetEl = e.target.closest('.fps-preset');
           if (presetEl) {
             touchTarget = presetEl;
             touchStartTime = Date.now();
             touchMoved = false;
           }
-        }, { passive: true });
+        }, { passive: true, capture: true });
 
-        fpsEl.addEventListener('touchmove', (e) => {
+        document.addEventListener('touchmove', (e) => {
           if (touchTarget) {
             touchMoved = true;
           }
-        }, { passive: true });
+        }, { passive: true, capture: true });
 
-        fpsEl.addEventListener('touchend', (e) => {
+        document.addEventListener('touchend', (e) => {
           const presetEl = e.target.closest('.fps-preset');
           if (presetEl && presetEl === touchTarget) {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
             const touchDuration = Date.now() - touchStartTime;
             // Only trigger if it was a tap (no movement, short duration)
             if (!touchMoved && touchDuration < 300) {
@@ -4157,9 +4186,10 @@
               }
             }
             touchTarget = null;
+            return false;
           }
-        });
-      }
+        }, { capture: true });
+      };
 
       palettes = {
 
@@ -4852,7 +4882,9 @@
     // Initialize preset display after a short delay to ensure FPS element exists
     setTimeout(() => {
       // Attach click/touch handlers first (using event delegation, so it persists)
-      attachPresetClickHandler();
+      if (window.attachPresetClickHandler) {
+        window.attachPresetClickHandler();
+      }
       if (window.updatePresetDisplay) {
         window.updatePresetDisplay();
       }
@@ -5163,7 +5195,9 @@
           } else {
             // Fallback: create the span if it doesn't exist
             fpsEl.innerHTML = `FPS: ${fps} | <span class="fps-preset" id="fpsPreset">${presetName}</span>`;
-            attachPresetClickHandler();
+            if (window.attachPresetClickHandler) {
+              window.attachPresetClickHandler();
+            }
           }
         }
 
