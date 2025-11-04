@@ -22,6 +22,12 @@
       z-index: 1000 !important;
       pointer-events: auto !important;
     }
+    
+    /* Ensure dat.GUI debug panel is above canvas */
+    .dg {
+      z-index: 1000 !important;
+      pointer-events: auto !important;
+    }
 
     .ui { position: absolute; top: 12px; left: 12px; padding: 12px 14px; border-radius: 14px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 8px 20px rgba(0,0,0,0.35); display: grid; gap: 10px; min-width: 320px; border: 1px solid rgba(255,255,255,0.06); }
 
@@ -940,19 +946,19 @@
 
       keyLightColor: '#fff8e1',
 
-      keyLightIntensity: 1.8,
+      keyLightIntensity: 2.8,
 
       keyLightX: 5.4,
 
       keyLightY: 3.7,
 
-      keyLightZ: 0.7000000000000001,
+      keyLightZ: 1.9,
 
       keyLightHarshness: 1,
 
       rimLightColor: '#272743',
 
-      rimLightIntensity: 9.5,
+      rimLightIntensity: 10,
 
       rimLightX: -1.3,
 
@@ -964,7 +970,7 @@
 
       ambientLightColor: '#786e93',
 
-      ambientLightIntensity: 2.5,
+      ambientLightIntensity: 0.5,
 
       emptyTileRatio: 35,
 
@@ -3615,10 +3621,27 @@
         if (soundController) soundController.setValue(debugConfig.soundEnabled);
       }
     });
-    document.getElementById('scoreboardSettings').addEventListener('click', ()=>{
-      toggleGUI();
-      resetScoreboardTimer();
-    });
+    // Use document-level click handler with capture phase for settings button
+    document.addEventListener('click', (e) => {
+      const settingsBtn = e.target.closest('#scoreboardSettings, .btn-settings');
+      if (settingsBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        console.log('Settings button clicked');
+        if (typeof toggleGUI === 'function') {
+          console.log('Calling toggleGUI, current guiVisible:', typeof guiVisible !== 'undefined' ? guiVisible : 'undefined');
+          toggleGUI();
+          console.log('After toggleGUI, guiVisible:', typeof guiVisible !== 'undefined' ? guiVisible : 'undefined');
+        } else {
+          console.error('toggleGUI function not found');
+        }
+        if (typeof resetScoreboardTimer === 'function') {
+          resetScoreboardTimer();
+        }
+        return false;
+      }
+    }, true); // Use capture phase to handle before canvas handlers
     
     // Palette modal functionality
     const paletteOverlay = document.getElementById('paletteOverlay');
@@ -4827,11 +4850,27 @@
 
     function toggleGUI(){
 
-      if (!gui) initGUI();
+      if (!gui) {
+        console.log('GUI not initialized, calling initGUI');
+        initGUI();
+      }
+
+      if (!gui) {
+        console.error('GUI still not initialized after initGUI');
+        return;
+      }
 
       guiVisible = !guiVisible;
 
-      gui.domElement.style.display = guiVisible ? 'block' : 'none';
+      console.log('Toggling GUI, new visibility:', guiVisible);
+      console.log('GUI domElement:', gui.domElement);
+      
+      if (gui.domElement) {
+        gui.domElement.style.display = guiVisible ? 'block' : 'none';
+        console.log('GUI display set to:', gui.domElement.style.display);
+      } else {
+        console.error('GUI domElement not found');
+      }
 
     }
 
