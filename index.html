@@ -46,6 +46,16 @@
     .scoreboard.collapsed .score-fraction,
     .scoreboard.collapsed .scoreboard-buttons { display: none; }
     
+    .scoreboard-timer { grid-column: 1 / 3; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
+    
+    .scoreboard.collapsed .scoreboard-timer { grid-column: 1 / 4; margin-top: 4px; }
+    
+    .timer-icon { width: 16px; height: 16px; color: #eaeef7; opacity: 0.7; }
+    
+    .timer-icon svg { width: 100%; height: 100%; fill: currentColor; }
+    
+    .timer-value { font-size: 14px; font-weight: 600; color: #eaeef7; font-variant-numeric: tabular-nums; }
+    
     .scoreboard-lives { grid-column: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
     
     .heart { width: 20px; height: 20px; color: #ff4d4d; filter: drop-shadow(0 0 4px #ff4d4d); transition: opacity 0.3s ease; }
@@ -271,6 +281,10 @@
       <div class="heart" id="heart1"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
       <div class="heart" id="heart2"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
       <div class="heart" id="heart3"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+    </div>
+    <div class="scoreboard-timer" id="scoreboardTimer">
+      <div class="timer-icon"><svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg></div>
+      <div class="timer-value" id="timerValue">00:00</div>
     </div>
     <div class="scoreboard-buttons">
       <button class="btn-reset" id="scoreboardReset">Reset</button>
@@ -1019,6 +1033,11 @@
     let revealQueue = [];
 
     let isRevealing = false;
+    
+    // Timer variables
+    let gameStartTime = null;
+    let elapsedTime = 0; // in seconds
+    let timerInterval = null;
 
     let isInitialReveal = false;
 
@@ -1440,6 +1459,9 @@
           // Start revealing tiles one by one
           isInitialReveal = true;
           processRevealQueue();
+          
+          // Start timer when game begins
+          startTimer();
         };
 
         tryGenerateBoard();
@@ -2400,6 +2422,7 @@
       if (state.lives <= 0) {
         state.gameOver = true;
         state.won = false;
+        stopTimer(); // Stop timer on game over
         playSound('gameOver');
         state.tiles.forEach((t)=>{ 
           if (t.mine){ 
@@ -2500,9 +2523,53 @@
 
 
 
-    function checkWin(){ const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length; if (state.safeRevealed >= totalSafe){ state.gameOver = true; state.won = true; showGameOver(); } }
+    function checkWin(){ const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length; if (state.safeRevealed >= totalSafe){ state.gameOver = true; state.won = true; stopTimer(); showGameOver(); } }
 
 
+
+    // Timer functions
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    function updateTimer() {
+      const timerValueEl = document.getElementById('timerValue');
+      if (timerValueEl) {
+        timerValueEl.textContent = formatTime(elapsedTime);
+      }
+    }
+    
+    function startTimer() {
+      if (timerInterval) return; // Already running
+      gameStartTime = Date.now();
+      timerInterval = setInterval(() => {
+        if (gameStartTime) {
+          elapsedTime = Math.floor((Date.now() - gameStartTime) / 1000);
+          updateTimer();
+        }
+      }, 1000);
+    }
+    
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      // Update final elapsed time
+      if (gameStartTime) {
+        elapsedTime = Math.floor((Date.now() - gameStartTime) / 1000);
+        updateTimer();
+      }
+    }
+    
+    function resetTimer() {
+      stopTimer();
+      gameStartTime = null;
+      elapsedTime = 0;
+      updateTimer();
+    }
 
     function updateCounters(){ 
       // Update scoreboard
@@ -2798,6 +2865,7 @@
     }
 
     function rebuildCore(f){
+      resetTimer(); // Reset timer on new game
       showLoading('Rebuilding geometry...');
 
       setTimeout(() => {
@@ -4741,6 +4809,7 @@
     initGUI();
 
     rebuildCore(debugConfig.tileDensity); runTests();
+    updateTimer(); // Initialize timer display
     
     // Initialize preset display after a short delay to ensure FPS element exists
     setTimeout(() => {
@@ -4949,8 +5018,8 @@
         const time = performance.now() * pulseSpeed;
         const pulseFactor = (Math.sin(time) * 0.5 + 0.5); // 0 to 1
         
-        // Use sine wave for smooth pulsing: 0.08 (base) to 1.2 (peak) - much more visible
-        const pulseIntensity = 0.08 + pulseFactor * 1.12; // 0.08 to 1.2
+        // Much more dramatic pulsing: 0.08 (base) to 2.0 (peak) - very visible
+        const pulseIntensity = 0.08 + pulseFactor * 1.92; // 0.08 to 2.0
         
         // Parse base hidden color for color animation
         const hiddenColorHex = debugConfig.hiddenColor.replace('#', '');
@@ -4958,28 +5027,31 @@
         const baseG = parseInt(hiddenColorHex.substr(2, 2), 16);
         const baseB = parseInt(hiddenColorHex.substr(4, 2), 16);
         
-        // Brighten the color during pulse (add white tint)
-        const brightenAmount = Math.round(pulseFactor * 60); // Add up to 60 brightness
+        // Brighten the color during pulse (add white tint) - more dramatic
+        const brightenAmount = Math.round(pulseFactor * 100); // Add up to 100 brightness
         const pulseR = Math.min(255, baseR + brightenAmount);
         const pulseG = Math.min(255, baseG + brightenAmount);
         const pulseB = Math.min(255, baseB + brightenAmount);
         
-        // Animate all unrevealed, unflagged, non-empty tiles
-        // Since matHidden is shared, we need to update it directly
-        let needsUpdate = false;
+        // Update ALL unrevealed, unflagged, non-empty tiles directly
+        // This ensures we catch all tiles regardless of material reference
         for (let i = 0; i < state.tiles.length; i++) {
           const t = state.tiles[i];
-          if (!t.revealed && !t.flagged && !t.isEmpty && t.mesh.material === matHidden) {
-            needsUpdate = true;
-            break;
+          if (!t.revealed && !t.flagged && !t.isEmpty) {
+            // Update material properties directly
+            if (t.mesh.material) {
+              t.mesh.material.emissiveIntensity = pulseIntensity;
+              // Very bright emissive color during pulse
+              const emissiveBright = 0x66 + Math.round(pulseFactor * 0x99); // 0x66 to 0xFF
+              t.mesh.material.emissive.setRGB(
+                emissiveBright / 255, 
+                emissiveBright / 255, 
+                emissiveBright / 255
+              );
+              // Brighten base color
+              t.mesh.material.color.setRGB(pulseR / 255, pulseG / 255, pulseB / 255);
+            }
           }
-        }
-        
-        if (needsUpdate) {
-          // Update shared material properties for all unrevealed tiles
-          matHidden.emissiveIntensity = pulseIntensity;
-          matHidden.emissive.setRGB(0x44 / 255, 0x44 / 255, 0x44 / 255); // Bright emissive
-          matHidden.color.setRGB(pulseR / 255, pulseG / 255, pulseB / 255); // Brighten base color
         }
       } else {
         // Reset properties for unrevealed tiles when below 80% or game over
@@ -4988,20 +5060,24 @@
         const baseG = parseInt(hiddenColorHex.substr(2, 2), 16);
         const baseB = parseInt(hiddenColorHex.substr(4, 2), 16);
         
-        // Only reset if we have unrevealed tiles using matHidden
-        let needsReset = false;
+        // Reset ALL unrevealed tiles
         for (let i = 0; i < state.tiles.length; i++) {
           const t = state.tiles[i];
-          if (!t.revealed && !t.flagged && !t.isEmpty && t.mesh.material === matHidden) {
-            needsReset = true;
-            break;
+          if (!t.revealed && !t.flagged && !t.isEmpty && t.mesh.material) {
+            // Check if this tile uses matHidden (shared material)
+            if (t.mesh.material === matHidden) {
+              // Reset shared material
+              matHidden.emissiveIntensity = 0.08;
+              matHidden.emissive.setRGB(0x11 / 255, 0x11 / 255, 0x11 / 255);
+              matHidden.color.setRGB(baseR / 255, baseG / 255, baseB / 255);
+              break; // Only need to reset once since it's shared
+            } else {
+              // Reset individual material
+              t.mesh.material.emissiveIntensity = 0.08;
+              t.mesh.material.emissive.setRGB(0x11 / 255, 0x11 / 255, 0x11 / 255);
+              t.mesh.material.color.setRGB(baseR / 255, baseG / 255, baseB / 255);
+            }
           }
-        }
-        
-        if (needsReset) {
-          matHidden.emissiveIntensity = 0.08; // Reset to default
-          matHidden.emissive.setRGB(0x11 / 255, 0x11 / 255, 0x11 / 255); // Reset to default
-          matHidden.color.setRGB(baseR / 255, baseG / 255, baseB / 255); // Reset to default
         }
       }
 
