@@ -735,7 +735,7 @@
 
     const matHidden = new THREE.MeshStandardMaterial({ color: debugConfig.hiddenColor, roughness: 0.95, metalness: 0.05, side: THREE.DoubleSide });
 
-    const matRevealed = new THREE.MeshStandardMaterial({ color: debugConfig.revealedColor, roughness: 0.2, metalness: 0.15, side: THREE.DoubleSide });
+    const matRevealed = new THREE.MeshStandardMaterial({ color: debugConfig.revealedColor, roughness: 0.7, metalness: 0.08, side: THREE.DoubleSide });
 
     const matFlag = new THREE.MeshStandardMaterial({ color: debugConfig.flagColor, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide });
 
@@ -1649,15 +1649,14 @@
 
       // Key light harshness affects material properties (how key light interacts with surfaces)
 
-      // Convert key light harshness (0-1) to roughness adjustment (more subtle range): lower harshness = higher roughness (more diffuse)
-
-      // Base roughness values
+      // Convert key light harshness (0-1) to roughness adjustment (very subtle range for more diffuse reflections)
+      // Base roughness values (more diffuse to start)
       const baseRoughnessHidden = 0.95;
-      const baseRoughnessRevealed = 0.55;
+      const baseRoughnessRevealed = 0.7; // Increased from 0.55 for more diffuse
       const baseMetalness = 0.05;
 
-      // Harshness only adjusts roughness slightly (reduced range: 0.2 instead of 0.75)
-      const roughnessAdjustment = debugConfig.keyLightHarshness * 0.2;
+      // Further reduced harshness impact - only 0.05 range instead of 0.2
+      const roughnessAdjustment = debugConfig.keyLightHarshness * 0.05;
 
       const targetRoughness = baseRoughnessHidden - roughnessAdjustment;
 
@@ -1665,7 +1664,7 @@
 
       matHidden.roughness = targetRoughness;
 
-      matRevealed.roughness = Math.max(0.1, baseRoughnessRevealed - roughnessAdjustment); // Revealed tiles can be shinier
+      matRevealed.roughness = Math.max(0.5, baseRoughnessRevealed - roughnessAdjustment); // More diffuse, min 0.5
 
       matFlag.roughness = targetRoughness;
 
@@ -1685,21 +1684,21 @@
 
       matMine.roughness = targetRoughness;
 
-      // Also adjust specular contribution based on key light harshness (more subtle)
-
-      const specularFactor = baseMetalness + (debugConfig.keyLightHarshness * 0.08); // Reduced from 0.15 to 0.08
+      // Also adjust specular contribution based on key light harshness (very subtle)
+      // Reduced from 0.08 to 0.03 for more diffuse reflections
+      const specularFactor = baseMetalness + (debugConfig.keyLightHarshness * 0.03);
 
       matHidden.metalness = specularFactor;
 
-      matRevealed.metalness = specularFactor + 0.2;
+      matRevealed.metalness = specularFactor + 0.1; // Reduced from 0.2 to 0.1
 
       matFlag.metalness = specularFactor;
 
       matMine.metalness = specularFactor;
 
       // Rim light harshness affects rim light intensity (how much rim light contributes)
-      // Harshness 0 = 70% intensity (softer), Harshness 1 = 100% intensity (reduced range for less dramatic effect)
-      rimLight.intensity = debugConfig.rimLightIntensity * (0.7 + debugConfig.rimLightHarshness * 0.3);
+      // Harshness 0 = 80% intensity (softer), Harshness 1 = 100% intensity (reduced range)
+      rimLight.intensity = debugConfig.rimLightIntensity * (0.8 + debugConfig.rimLightHarshness * 0.2);
       
       // Slightly boost rim light for better silhouette contrast
       rimLight.intensity *= 1.2;
