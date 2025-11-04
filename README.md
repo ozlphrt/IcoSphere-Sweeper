@@ -6,9 +6,9 @@ A spherical Minesweeper game using Goldberg Tiling (geodesic sphere) built with 
 
 - **🌐 Live Game (GitHub Pages)**: https://ozlphrt.github.io/IcoSphere-Sweeper/
 - **Main Repository**: https://github.com/ozlphrt/IcoSphere-Sweeper
-- **Latest Version (Raw HTML)**: https://raw.githubusercontent.com/ozlphrt/IcoSphere-Sweeper/0d47db7/index.html
+- **Latest Version (Raw HTML)**: https://raw.githubusercontent.com/ozlphrt/IcoSphere-Sweeper/2521068/index.html
 - **Master Branch (Raw HTML)**: https://raw.githubusercontent.com/ozlphrt/IcoSphere-Sweeper/master/index.html
-- **Latest Commit Tree**: https://github.com/ozlphrt/IcoSphere-Sweeper/tree/0d47db7
+- **Latest Commit Tree**: https://github.com/ozlphrt/IcoSphere-Sweeper/tree/2521068
 
 ### How to Run Locally
 
