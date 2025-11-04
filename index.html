@@ -1,0 +1,5183 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Spherical Minesweeper – Goldberg Tiling</title>
+
+  <style>
+
+    html, body { height: 100%; margin: 0; background: #121911; color: #eaeef7; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+
+    #app { position: fixed; inset: 0; }
+
+    .ui { position: absolute; top: 12px; left: 12px; padding: 12px 14px; border-radius: 14px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 8px 20px rgba(0,0,0,0.35); display: grid; gap: 10px; min-width: 320px; border: 1px solid rgba(255,255,255,0.06); }
+
+    .row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+
+    .row label { font-size: 12px; opacity: 0.9; }
+
+    .row output { font-variant-numeric: tabular-nums; font-size: 12px; opacity: 0.9; }
+
+    input[type=range] { width: 180px; }
+
+    .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); }
+
+    .btn { font-size: 12px; padding: 6px 10px; border-radius: 10px; color: #0b0d12; background: #9ad1ff; border: 0; cursor: pointer; font-weight: 600; }
+
+    .btn:active { transform: translateY(1px); }
+
+    .ok { color: #b1ffb0; }
+
+    .bad { color: #ff8080; }
+
+    .fps { position: absolute; bottom: 12px; right: 12px; padding: 6px 10px; border-radius: 8px; backdrop-filter: blur(8px); background: rgba(16,19,30,0.55); box-shadow: 0 4px 12px rgba(0,0,0,0.35); font-size: 11px; font-variant-numeric: tabular-nums; color: #eaeef7; border: 1px solid rgba(255,255,255,0.06); }
+    .fps-preset { cursor: pointer; text-decoration: underline; text-decoration-color: rgba(255,255,255,0.3); transition: all 0.2s; user-select: none; }
+    .fps-preset:hover { color: #9ad1ff; text-decoration-color: rgba(154,209,255,0.5); }
+    .fps-preset:active { opacity: 0.7; }
+
+    .scoreboard { position: absolute; top: 12px; left: 12px; padding: 12px; border-radius: 12px; backdrop-filter: blur(12px); background: rgba(16,19,30,0.75); box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; min-width: 260px; border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s ease; cursor: pointer; }
+    
+    .scoreboard.collapsed { gap: 8px; padding: 8px; min-width: auto; }
+    
+    .scoreboard.collapsed .score-title,
+    .scoreboard.collapsed .score-fraction,
+    .scoreboard.collapsed .scoreboard-buttons { display: none; }
+    
+    .scoreboard-timer { grid-column: 1 / 3; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
+    
+    .scoreboard.collapsed .scoreboard-timer { grid-column: 1 / 4; margin-top: 4px; }
+    
+    .timer-icon { width: 16px; height: 16px; color: #eaeef7; opacity: 0.7; }
+    
+    .timer-icon svg { width: 100%; height: 100%; fill: currentColor; }
+    
+    .timer-value { font-size: 14px; font-weight: 600; color: #eaeef7; font-variant-numeric: tabular-nums; }
+    
+    .scoreboard-lives { grid-column: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+    
+    .heart { width: 20px; height: 20px; color: #ff4d4d; filter: drop-shadow(0 0 4px #ff4d4d); transition: opacity 0.3s ease; }
+    
+    .heart.empty { opacity: 0.3; }
+    
+    .heart svg { width: 100%; height: 100%; fill: currentColor; }
+
+    .score-section { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+    .score-circle { position: relative; width: 80px; height: 80px; filter: drop-shadow(0 0 8px currentColor); }
+
+    .score-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+    .score-circle circle { fill: none; stroke-width: 8; transition: stroke-dashoffset 0.3s ease; }
+
+    .score-circle .bg { stroke: rgba(255,255,255,0.1); }
+
+    .score-circle .progress-mine { stroke: #ff4d4d; stroke-linecap: round; filter: drop-shadow(0 0 6px #ff4d4d); }
+
+    .score-circle .progress-explore { stroke: #00d4ff; stroke-linecap: round; filter: drop-shadow(0 0 6px #00d4ff); }
+
+    .score-percentage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 22px; font-weight: 700; color: #ffffff; }
+
+    .score-percentage small { font-size: 13px; opacity: 0.7; }
+
+    .score-title { font-size: 11px; font-weight: 600; color: #eaeef7; opacity: 0.9; }
+
+    .score-fraction { font-size: 10px; color: #eaeef7; opacity: 0.7; }
+
+    .scoreboard-buttons { grid-column: 1 / 3; display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; margin-top: 4px; }
+
+    .btn-reset { padding: 8px 16px; border-radius: 8px; border: 0; background: rgba(255,255,255,0.1); color: #eaeef7; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+
+    .btn-reset:hover { background: rgba(255,255,255,0.15); }
+
+    .btn-sound { width: 40px; height: 40px; padding: 0; border-radius: 8px; border: 0; background: rgba(255,255,255,0.1); color: #eaeef7; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+
+    .btn-sound:hover { background: rgba(255,255,255,0.15); }
+
+    .btn-sound svg { width: 24px; height: 24px; fill: currentColor; pointer-events: none; }
+
+    .btn-settings { width: 40px; height: 40px; padding: 0; border-radius: 8px; border: 0; background: rgba(255,255,255,0.1); color: #eaeef7; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+
+    .btn-settings:hover { background: rgba(255,255,255,0.15); }
+
+    .btn-settings svg { width: 24px; height: 24px; fill: currentColor; pointer-events: none; }
+
+    .btn-palette { width: 40px; height: 40px; padding: 0; border-radius: 8px; border: 0; background: rgba(255,255,255,0.1); color: #eaeef7; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+
+    .btn-palette:hover { background: rgba(255,255,255,0.15); }
+
+    .btn-palette svg { width: 24px; height: 24px; fill: currentColor; pointer-events: none; }
+
+    .palette-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 1001; backdrop-filter: blur(4px); background: rgba(0, 0, 0, 0.6); }
+
+    .palette-overlay.visible { display: flex; }
+
+    .palette-panel { padding: 24px; border-radius: 16px; backdrop-filter: blur(12px); background: rgba(16, 19, 30, 0.95); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); min-width: 400px; max-width: 90vw; max-height: 90vh; overflow-y: auto; }
+
+    .palette-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #9ad1ff; }
+
+    .palette-hint { font-size: 12px; opacity: 0.7; margin-bottom: 20px; color: #eaeef7; }
+
+    .palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+
+    .palette-item { padding: 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); border: 2px solid transparent; cursor: pointer; transition: all 0.2s; text-align: center; }
+
+    .palette-item:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
+
+    .palette-item.active { background: rgba(154, 209, 255, 0.2); border-color: #9ad1ff; }
+
+    .palette-thumbnail { width: 100%; height: 60px; border-radius: 6px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; background: #000; }
+
+    .palette-thumbnail canvas { width: 100%; height: 100%; object-fit: cover; }
+
+    .palette-name { font-size: 12px; font-weight: 600; color: #eaeef7; }
+
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .scoreboard { min-width: auto; padding: 10px; gap: 12px; }
+      .score-circle { width: 60px; height: 60px; }
+      .score-percentage { font-size: 16px; }
+      .score-percentage small { font-size: 10px; }
+      .score-title { font-size: 10px; }
+      .score-fraction { font-size: 9px; }
+      .btn-reset { padding: 6px 12px; font-size: 10px; }
+      .btn-sound { width: 36px; height: 36px; }
+      .btn-sound svg { width: 20px; height: 20px; }
+      .btn-settings { width: 36px; height: 36px; }
+      .btn-settings svg { width: 20px; height: 20px; }
+      .fps { font-size: 10px; padding: 4px 8px; }
+    }
+
+    /* Game over overlay */
+    .game-over-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); background: rgba(0, 0, 0, 0.5); }
+    
+    .game-over-overlay.visible { display: flex; }
+    
+    .game-over-panel { padding: 32px; border-radius: 16px; backdrop-filter: blur(12px); background: rgba(16, 19, 30, 0.9); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); min-width: 320px; max-width: 90vw; text-align: center; }
+    
+    .loading-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(4px); background: rgba(0, 0, 0, 0.6); }
+    
+    .loading-overlay.visible { display: flex; }
+    
+    .loading-panel { padding: 32px; border-radius: 16px; backdrop-filter: blur(12px); background: rgba(16, 19, 30, 0.9); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); min-width: 280px; max-width: 90vw; text-align: center; }
+    
+    .loading-title { font-size: 24px; font-weight: 700; margin-bottom: 16px; color: #9ad1ff; }
+    
+    .loading-message { font-size: 14px; color: #eaeef7; opacity: 0.9; margin-bottom: 8px; }
+    
+    .loading-spinner { width: 40px; height: 40px; margin: 20px auto; border: 4px solid rgba(154, 209, 255, 0.2); border-top-color: #9ad1ff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .game-over-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+    
+    .game-over-title.win { color: #00d4ff; text-shadow: 0 0 16px #00d4ff; }
+    
+    .game-over-title.loss { color: #ff4d4d; text-shadow: 0 0 16px #ff4d4d; }
+    
+    .game-over-subtitle { font-size: 14px; opacity: 0.7; margin-bottom: 24px; }
+    
+    .game-over-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    
+    .stat-item { display: flex; flex-direction: column; gap: 4px; }
+    
+    .stat-label { font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .stat-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    
+    .stat-value.mine-hunt { color: #ff4d4d; }
+    
+    .stat-value.exploration { color: #00d4ff; }
+    
+    .btn-restart { padding: 12px 32px; border-radius: 10px; border: 0; background: #9ad1ff; color: #0b0d12; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s; }
+    
+    .btn-restart:hover { background: #7bb3e8; }
+    
+    .btn-restart:active { transform: translateY(1px); }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .game-over-panel { padding: 24px; min-width: 280px; }
+      .game-over-title { font-size: 24px; }
+      .game-over-stats { gap: 12px; }
+      .stat-value { font-size: 20px; }
+      .btn-restart { padding: 10px 24px; font-size: 13px; }
+    }
+
+    /* Prevent text selection and touch callouts */
+    #app { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; touch-action: none; }
+    button { -webkit-tap-highlight-color: transparent; }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div id="app"></div>
+
+  <div class="fps" id="fps">FPS: -- | <span class="fps-preset" id="fpsPreset">Shadow</span></div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-panel">
+      <div class="loading-title">Loading Game</div>
+      <div class="loading-message" id="loadingMessage">Initializing...</div>
+      <div class="loading-spinner"></div>
+    </div>
+  </div>
+
+  <div class="game-over-overlay" id="gameOverOverlay">
+    <div class="game-over-panel">
+      <div class="game-over-title" id="gameOverTitle">Game Over</div>
+      <div class="game-over-subtitle" id="gameOverSubtitle">You ran out of lives</div>
+      <div class="game-over-stats">
+        <div class="stat-item">
+          <div class="stat-label">Mine Hunt</div>
+          <div class="stat-value mine-hunt" id="statMineHunt">0%</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Exploration</div>
+          <div class="stat-value exploration" id="statExploration">0%</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Flags Placed</div>
+          <div class="stat-value" id="statFlags">0/0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Tiles Revealed</div>
+          <div class="stat-value" id="statRevealed">0/0</div>
+        </div>
+      </div>
+      <button class="btn-restart" id="gameOverRestart">Restart</button>
+    </div>
+  </div>
+
+  <div class="scoreboard" id="scoreboard">
+    <div class="score-section">
+      <div class="score-circle" id="mineCircle">
+        <svg viewBox="0 0 100 100">
+          <circle class="bg" cx="50" cy="50" r="45"></circle>
+          <circle class="progress-mine" id="mineProgress" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"></circle>
+        </svg>
+        <div class="score-percentage" id="minePercent">0<small>%</small></div>
+      </div>
+      <div class="score-title">Mine Hunt</div>
+      <div class="score-fraction" id="mineFraction">0/0</div>
+    </div>
+    <div class="score-section">
+      <div class="score-circle" id="exploreCircle">
+        <svg viewBox="0 0 100 100">
+          <circle class="bg" cx="50" cy="50" r="45"></circle>
+          <circle class="progress-explore" id="exploreProgress" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"></circle>
+        </svg>
+        <div class="score-percentage" id="explorePercent">0<small>%</small></div>
+      </div>
+      <div class="score-title">Exploration</div>
+      <div class="score-fraction" id="exploreFraction">0/0</div>
+    </div>
+    <div class="scoreboard-lives" id="scoreboardLives">
+      <div class="heart" id="heart1"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+      <div class="heart" id="heart2"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+      <div class="heart" id="heart3"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+    </div>
+    <div class="scoreboard-timer" id="scoreboardTimer">
+      <div class="timer-icon"><svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg></div>
+      <div class="timer-value" id="timerValue">00:00</div>
+    </div>
+    <div class="scoreboard-buttons">
+      <button class="btn-reset" id="scoreboardReset">Reset</button>
+      <button class="btn-sound" id="scoreboardSound" title="Toggle Sound">
+        <svg class="sound-on" viewBox="0 0 24 24" style="display: block;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        <svg class="sound-off" viewBox="0 0 24 24" style="display: none;"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+      </button>
+      <button class="btn-settings" id="scoreboardSettings" title="Settings">
+        <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+      </button>
+      <button class="btn-palette" id="scoreboardPalette" title="Color Presets">
+        <svg viewBox="0 0 24 24"><path d="M12,3C6.48,3,2,7.48,2,13c0,3.69,2.47,6.86,6,7.93v-2.01C7.35,17.77,6,15.54,6,13c0-3.31,2.69-6,6-6s6,2.69,6,6 c0,2.54-1.35,4.77-3.36,6.07L12,20.93v-2.01C15.53,17.86,18,14.69,18,11C18,6.48,13.52,3,12,3z M12,11c-1.1,0-2-0.9-2-2s0.9-2,2-2 s2,0.9,2,2S13.1,11,12,11z M17,13c-1.1,0-2-0.9-2-2s0.9-2,2-2s2,0.9,2,2S18.1,13,17,13z M7,13c-1.1,0-2-0.9-2-2s0.9-2,2-2 s2,0.9,2,2S8.1,13,7,13z M12,15c-1.1,0-2-0.9-2-2s0.9-2,2-2s2,0.9,2,2S13.1,15,12,15z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="palette-overlay" id="paletteOverlay">
+    <div class="palette-panel">
+      <div class="palette-title">Color Presets</div>
+      <div class="palette-hint">Press <strong>P</strong> to cycle presets during gameplay</div>
+      <div class="palette-grid" id="paletteGrid"></div>
+    </div>
+  </div>
+
+  <!-- Suppress Three.js multiple instances warning before loading -->
+  <script>
+    // Patch console.warn early to suppress Three.js multiple instances warning
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('Multiple instances of Three.js')) {
+        return; // Suppress this specific warning
+      }
+      originalWarn.apply(console, args);
+    };
+  </script>
+
+  <!-- Three.js (UMD) pinned to r146 -->
+  <!-- Using UMD version for main code, module version only for post-processing imports -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
+
+  <!-- Note: Post-processing modules require ES module version of Three.js -->
+  <!-- The warning about multiple instances is expected and harmless, but suppressed above -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import { EffectComposer } from 'https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/postprocessing/RenderPass.js';
+    import { BokehPass } from 'https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/postprocessing/BokehPass.js';
+    import { ShaderPass } from 'https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/postprocessing/ShaderPass.js';
+    import { CopyShader } from 'https://cdn.jsdelivr.net/npm/three@0.146.0/examples/jsm/shaders/CopyShader.js';
+    
+    // Simple blur shader
+    const BlurShader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        resolution: { value: new THREE.Vector2(1, 1) },
+        strength: { value: 1.0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform vec2 resolution;
+        uniform float strength;
+        varying vec2 vUv;
+        
+        void main() {
+          vec2 offset = (1.0 / resolution) * strength;
+          vec4 color = vec4(0.0);
+          color += texture2D(tDiffuse, vUv + vec2(-offset.x, -offset.y)) * 0.0625;
+          color += texture2D(tDiffuse, vUv + vec2(0.0, -offset.y)) * 0.125;
+          color += texture2D(tDiffuse, vUv + vec2(offset.x, -offset.y)) * 0.0625;
+          color += texture2D(tDiffuse, vUv + vec2(-offset.x, 0.0)) * 0.125;
+          color += texture2D(tDiffuse, vUv) * 0.25;
+          color += texture2D(tDiffuse, vUv + vec2(offset.x, 0.0)) * 0.125;
+          color += texture2D(tDiffuse, vUv + vec2(-offset.x, offset.y)) * 0.0625;
+          color += texture2D(tDiffuse, vUv + vec2(0.0, offset.y)) * 0.125;
+          color += texture2D(tDiffuse, vUv + vec2(offset.x, offset.y)) * 0.0625;
+          gl_FragColor = color;
+        }
+      `
+    };
+    
+    window.postprocessing = { EffectComposer, RenderPass, BokehPass, ShaderPass, CopyShader, BlurShader };
+  </script>
+
+  <script>
+
+    // ===== Geometry core =====
+
+    function icosahedron(radius = 1) {
+
+      const t = (1 + Math.sqrt(5)) / 2;
+
+      const verts = [
+
+        new THREE.Vector3(-1,  t,  0), new THREE.Vector3( 1,  t,  0), new THREE.Vector3(-1, -t,  0), new THREE.Vector3( 1, -t,  0),
+
+        new THREE.Vector3( 0, -1,  t), new THREE.Vector3( 0,  1,  t), new THREE.Vector3( 0, -1, -t), new THREE.Vector3( 0,  1, -t),
+
+        new THREE.Vector3( t,  0, -1), new THREE.Vector3( t,  0,  1), new THREE.Vector3(-t,  0, -1), new THREE.Vector3(-t,  0,  1),
+
+      ];
+
+      for (const v of verts) v.normalize().multiplyScalar(radius);
+
+      const faces = [
+
+        [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
+
+        [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+
+        [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],
+
+        [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]
+
+      ];
+
+      return { verts, faces };
+
+    }
+
+
+
+    function geodesicSubdivide(base, f, radius=1) {
+
+      if (f < 1) f = 1;
+
+      const vertsMap = new Map();
+
+      const verts = [];
+
+      const faces = [];
+
+      const put = (v) => {
+
+        const s = 1e5;
+
+        const key = `${Math.round(v.x*s)}_${Math.round(v.y*s)}_${Math.round(v.z*s)}`;
+
+        let id = vertsMap.get(key);
+
+        if (id === undefined) {
+
+          const n = v.clone().normalize().multiplyScalar(radius);
+
+          id = verts.length; verts.push(n); vertsMap.set(key, id);
+
+        }
+
+        return id;
+
+      };
+
+      const { verts: bV, faces: bF } = base;
+
+      for (const [a,b,c] of bF) {
+
+        const A = bV[a], B = bV[b], C = bV[c];
+
+        const grid = [];
+
+        for (let i=0; i<=f; i++) {
+
+          grid[i] = [];
+
+          for (let j=0; j<=f-i; j++) {
+
+            const k = f - i - j;
+
+            const p = new THREE.Vector3()
+
+              .addScaledVector(A, i/f)
+
+              .addScaledVector(B, j/f)
+
+              .addScaledVector(C, k/f);
+
+            grid[i][j] = put(p);
+
+          }
+
+        }
+
+        for (let i=0; i<f; i++) {
+
+          for (let j=0; j<f-i; j++) {
+
+            const v0 = grid[i][j];
+
+            const v1 = grid[i+1][j];
+
+            const v2 = grid[i][j+1];
+
+            faces.push([v0, v1, v2]);
+
+            if (j < f - i - 1) {
+
+              const v3 = grid[i+1][j+1];
+
+              faces.push([v1, v3, v2]);
+
+            }
+
+          }
+
+        }
+
+      }
+
+      return { verts, faces };
+
+    }
+
+
+
+    function buildDualPolygons(verts, faces) {
+
+      const incident = Array.from({length: verts.length}, () => []);
+
+      const faceCentroids = faces.map(f => {
+
+        const c = new THREE.Vector3();
+
+        c.add(verts[f[0]]).add(verts[f[1]]).add(verts[f[2]]).multiplyScalar(1/3).normalize();
+
+        return c;
+
+      });
+
+      faces.forEach((f, fi) => { f.forEach(v => incident[v].push(fi)); });
+
+
+
+      const polys = [];
+
+      const tmpU = new THREE.Vector3();
+
+      const tmpV = new THREE.Vector3();
+
+      for (let vi=0; vi<verts.length; vi++) {
+
+        const v = verts[vi].clone().normalize();
+
+        const ref = Math.abs(v.x) < 0.9 ? new THREE.Vector3(1,0,0) : new THREE.Vector3(0,1,0);
+
+        const u = tmpU.copy(ref).cross(v).normalize();
+
+        const w = tmpV.copy(v).cross(u).normalize();
+
+        const list = incident[vi].map(fi => {
+
+          const c = faceCentroids[fi];
+
+          const ang = Math.atan2(c.dot(w), c.dot(u));
+
+          return { fi, ang, c };
+
+        }).sort((a,b)=>a.ang-b.ang);
+
+        polys.push(list.map(o => o.c.clone()));
+
+      }
+
+      return polys; // Array<Array<Vector3>>
+
+    }
+
+
+
+    function buildAdjacency(polys) {
+
+      const vertId = new Map();
+
+      const idOf = (v)=>{
+
+        const s=1e5; const key = `${Math.round(v.x*s)}_${Math.round(v.y*s)}_${Math.round(v.z*s)}`;
+
+        let id = vertId.get(key); if (id===undefined){ id = vertId.size; vertId.set(key,id);} return id;
+
+      };
+
+      const edgeMap = new Map();
+
+      const neigh = polys.map(()=> new Set());
+
+      polys.forEach((poly, pi)=>{
+
+        const ids = poly.map(idOf);
+
+        const n = ids.length;
+
+        for (let i=0;i<n;i++){
+
+          const a = ids[i], b = ids[(i+1)%n];
+
+          const k = a<b ? `${a}_${b}` : `${b}_${a}`;
+
+          const prev = edgeMap.get(k);
+
+          if (prev===undefined) edgeMap.set(k, pi); else { neigh[pi].add(prev); neigh[prev].add(pi); }
+
+        }
+
+      });
+
+      return neigh.map(set=>Array.from(set));
+
+    }
+
+
+
+    function polygonToMesh(poly, mat) {
+
+      const center = new THREE.Vector3(); poly.forEach(p=>center.add(p)); center.multiplyScalar(1/poly.length).normalize();
+
+      const n = poly.length;
+
+      const positions = [];
+
+      for (let i=0;i<n;i++){
+
+        const a = poly[i];
+
+        const b = poly[(i+1)%n];
+
+        positions.push(center.x,center.y,center.z, a.x,a.y,a.z, b.x,b.y,b.z);
+
+      }
+
+      const g = new THREE.BufferGeometry();
+
+      g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(positions),3));
+
+      g.computeVertexNormals();
+      
+      // Ensure smooth shading to hide triangle edges
+      const normals = g.getAttribute('normal');
+      if (normals) {
+        // For each triangle, use the center normal (pointing outward from sphere)
+        const normalArray = normals.array;
+        for (let i = 0; i < normalArray.length; i += 9) {
+          // All three vertices of each triangle share the same normal (center normal)
+          const nx = center.x, ny = center.y, nz = center.z;
+          normalArray[i] = nx; normalArray[i+1] = ny; normalArray[i+2] = nz;
+          normalArray[i+3] = nx; normalArray[i+4] = ny; normalArray[i+5] = nz;
+          normalArray[i+6] = nx; normalArray[i+7] = ny; normalArray[i+8] = nz;
+        }
+        normals.needsUpdate = true;
+      }
+
+      return new THREE.Mesh(g, mat);
+
+    }
+
+
+
+    function makeNumberPlane(n, scale, centerNormal) {
+
+      const size = 128; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0,0,size,size);
+
+      // Font size proportional to tile size (scale parameter)
+
+      // Scale ranges roughly from 0.06 to 0.16, map to font size range 96-256px
+
+      const fontSize = Math.max(96, Math.min(256, Math.round(192 * (scale / 0.12))));
+
+      ctx.font = `700 ${fontSize}px system-ui, Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+      // Add subtle glow effect
+      ctx.shadowColor = debugConfig.numberColor;
+      ctx.shadowBlur = Math.max(4, Math.round(fontSize / 20));
+      
+      ctx.fillStyle = debugConfig.numberColor;
+
+      ctx.fillText(String(n), size/2, size/2);
+      
+      // Reset shadow for other drawing operations
+      ctx.shadowBlur = 0;
+
+      const tex = new THREE.CanvasTexture(canvas); tex.anisotropy = 4; tex.needsUpdate = true;
+
+      const m = new THREE.MeshStandardMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+
+      const geometry = new THREE.PlaneGeometry(1, 1);
+
+      const plane = new THREE.Mesh(geometry, m);
+
+      plane.userData.number = n;
+
+      const k = scale != null ? scale : 0.12;
+
+      plane.scale.set(k, k, 1);
+
+      // Orient plane to lie flat on tile surface (perpendicular to tile normal)
+
+      // Plane's default normal is +Z, so we rotate it to match the tile center (outward normal)
+
+      const quaternion = new THREE.Quaternion();
+
+      quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), centerNormal);
+
+      plane.quaternion.copy(quaternion);
+
+      // Apply rotation offset if configured (rotate around the tile normal)
+
+      if (debugConfig.numberRotation !== 0) {
+
+        plane.rotateOnAxis(centerNormal, debugConfig.numberRotation * (Math.PI / 180));
+
+      }
+
+      return plane;
+
+    }
+
+
+
+    // ===== Utilities =====
+
+    function labelScale(f){
+
+      const k = 0.34 / Math.max(1, f);
+
+      return Math.max(0.06, Math.min(0.16, k));
+
+    }
+
+
+
+    function buildEdgeLines(polys, colorHex, colorPent) {
+
+      const pts = [], pentPts = [];
+
+      const lineRadius = 1.001;
+
+      for (const poly of polys) {
+
+        const n = poly.length;
+
+        for (let i=0; i<n; i++) {
+
+          const a = poly[i]; const b = poly[(i+1)%n];
+
+          pts.push(a.x * lineRadius, a.y * lineRadius, a.z * lineRadius, b.x * lineRadius, b.y * lineRadius, b.z * lineRadius);
+
+        }
+
+        if (n === 5) {
+
+          for (let i=0; i<5; i++) { const a = poly[i]; const b = poly[(i+1)%5]; pentPts.push(a.x * lineRadius, a.y * lineRadius, a.z * lineRadius, b.x * lineRadius, b.y * lineRadius, b.z * lineRadius); }
+
+        }
+
+      }
+
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pts), 3));
+
+      const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: colorHex }));
+
+      let pentLines = null; if (pentPts.length) { const gp = new THREE.BufferGeometry(); gp.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pentPts), 3)); pentLines = new THREE.LineSegments(gp, new THREE.LineBasicMaterial({ color: colorPent })); }
+
+      return { lines, pentLines };
+
+    }
+
+
+
+    // ===== Scene setup =====
+
+    const app = document.getElementById('app');
+
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x121911);
+    scene.fog = new THREE.Fog(new THREE.Color(0x121911), 2.4, 3.8);
+
+    const camera = new THREE.PerspectiveCamera(34, innerWidth/innerHeight, 0.432, 230); camera.position.set(0, 0, 2.8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); app.appendChild(renderer.domElement);
+
+    // Post-processing setup
+    let composer = null;
+    if (window.postprocessing) {
+      const { EffectComposer, RenderPass, BokehPass } = window.postprocessing;
+      composer = new EffectComposer(renderer);
+      const renderPass = new RenderPass(scene, camera);
+      composer.addPass(renderPass);
+      
+      const bokehPass = new BokehPass(scene, camera, {
+        focus: 2.8,
+        aperture: 0.015,
+        maxblur: 0.005
+      });
+      composer.addPass(bokehPass);
+    }
+
+    // Camera is fixed, sphere will rotate instead
+    // const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+
+
+
+    // Professional lighting setup (optimized for camera at 0,0,3.4 looking at origin)
+
+    // Key light (sun) - primary illumination from top-front-right
+
+    // Positioned to create natural highlights visible from camera's initial view
+
+    const keyLight = new THREE.DirectionalLight(0xfff8e1, 2.8000000000000003);
+
+    keyLight.position.set(9.700000000000001, 4.1000000000000005, -0.4);
+
+    keyLight.castShadow = false;
+
+    scene.add(keyLight);
+
+    // Rim light - back edge definition, opposite to key light
+
+    // Creates subtle edge highlights for depth separation
+
+    const rimLight = new THREE.DirectionalLight(0x272743, 9.5);
+
+    rimLight.position.set(-1.3, -1, 0.30000000000000004);
+
+    scene.add(rimLight);
+
+    // Ambient light - subtle fill to prevent harsh shadows
+
+    // Provides base illumination without direction
+
+    const ambientLight = new THREE.AmbientLight(0x786e93, 2.5);
+
+    scene.add(ambientLight);
+
+
+
+    // Pivot group to rotate the entire sphere (tiles and wireframe)
+    let spherePivot = new THREE.Group();
+    scene.add(spherePivot);
+
+    let wireGroup = new THREE.Group(); spherePivot.add(wireGroup);
+
+    let tileGroup = new THREE.Group(); spherePivot.add(tileGroup);
+
+    let particleGroup = new THREE.Group(); scene.add(particleGroup);
+
+    // Sphere rotation state for manual rotation
+    // Use quaternion for rotation to avoid gimbal lock and maintain consistent screen-space rotation
+    let sphereQuaternion = new THREE.Quaternion();
+    let targetQuaternion = new THREE.Quaternion();
+    let spherePosition = new THREE.Vector3(0, 0, 0);
+    let targetPosition = new THREE.Vector3(0, 0, 0);
+    let isRotating = false;
+    let isPanning = false;
+    let lastMousePos = { x: 0, y: 0 };
+    const rotationSpeed = 0.002;
+    const panSpeed = 0.003;
+    const damping = 0.1; // Smoothing factor for gradual movement
+
+
+
+    // ===== Debug config =====
+
+    const debugConfig = {
+
+      tileDensity: 15,
+
+      mineRatio: 5,
+
+      immortalMode: false,
+
+      wireHexColor: '#314236',
+
+      wirePentColor: '#434343',
+
+      hiddenColor: '#434343',
+
+      revealedColor: '#2e3659',
+
+      flagColor: '#632676',
+
+      mineColor: '#ff0000',
+
+      mineEmissive: '#202050',
+
+      numberOffset: 1.004,
+
+      numberRotation: 0,
+
+      numberRotationX: 0,
+
+      numberRotationY: 0,
+
+      numberRotationZ: 0,
+
+      numberScale: 0.8,
+
+      numberColor: '#8aaadd',
+
+      cameraFOV: 34.999999960263565,
+
+      cameraX: 0,
+
+      cameraY: 0,
+
+      cameraZ: 2.8,
+
+      cameraNear: 0.432,
+
+      cameraFar: 230,
+
+      soundEnabled: true,
+
+      soundVolume: 0.5,
+
+      revealSoundIndex: 3,
+
+      flagSoundIndex: 5,
+
+      gameOverSoundIndex: 0,
+
+      clickSoundPitch: 800,
+
+      flagSoundPitch: 600,
+
+      gameOverSoundDuration: 0.5,
+
+      keyLightColor: '#fff8e1',
+
+      keyLightIntensity: 1.8,
+
+      keyLightX: 5.4,
+
+      keyLightY: 3.7,
+
+      keyLightZ: 0.7000000000000001,
+
+      keyLightHarshness: 1,
+
+      rimLightColor: '#272743',
+
+      rimLightIntensity: 9.5,
+
+      rimLightX: -1.3,
+
+      rimLightY: -1,
+
+      rimLightZ: -0.8,
+
+      rimLightHarshness: 1,
+
+      ambientLightColor: '#786e93',
+
+      ambientLightIntensity: 2.5,
+
+      emptyTileRatio: 35,
+
+      initialRevealPercent: 2,
+
+      emptyGlassOpacity: 0.3,
+
+      emptyGlassTint: '#5a7aff',
+
+      backgroundColor: '#121911',
+
+      fogEnabled: true,
+
+      fogNear: 2.4,
+
+      fogFar: 3.8
+
+    };
+
+
+
+    // ===== Minesweeper state & materials =====
+
+    // Hidden tiles: Very matte, non-reflective, minimal self-illumination - darker for distinction
+    const matHidden = new THREE.MeshStandardMaterial({ 
+      color: debugConfig.hiddenColor, 
+      roughness: 0.98, // Very matte, almost no reflection
+      metalness: 0.0, // Completely non-metallic
+      side: THREE.FrontSide, 
+      emissive: new THREE.Color(0x080808), // Minimal self-illumination - darker than before
+      emissiveIntensity: 0.05, // Reduced from 0.08 for more contrast
+      envMapIntensity: 0.0 // No environment reflections
+    });
+
+    // Revealed tiles: Glossy, reflective, bright illumination - more distinct
+    const matRevealed = new THREE.MeshStandardMaterial({ 
+      color: debugConfig.revealedColor, 
+      roughness: 0.2, // Smoother, more reflective (reduced from 0.3)
+      metalness: 0.2, // Slightly more metallic for better reflections (increased from 0.15)
+      side: THREE.FrontSide, 
+      emissive: new THREE.Color(0x666666), // Brighter self-illumination (increased from 0x444444)
+      emissiveIntensity: 0.5, // Increased from 0.35 for more visibility
+      envMapIntensity: 1.2 // Increased environment reflections (from 1.0)
+    });
+
+    const matFlag = new THREE.MeshStandardMaterial({ color: debugConfig.flagColor, roughness: 0.6, metalness: 0.05, side: THREE.FrontSide });
+
+    const matMine = new THREE.MeshStandardMaterial({ color: debugConfig.mineColor, emissive: debugConfig.mineEmissive, roughness: 0.6, side: THREE.FrontSide });
+
+    // Empty tiles: Bright, glowing, semi-transparent - highly visible
+    const matEmpty = new THREE.MeshStandardMaterial({ 
+      transparent: true, 
+      opacity: Math.max(0.5, debugConfig.emptyGlassOpacity), // Increased minimum opacity for visibility
+      color: debugConfig.emptyGlassTint,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      roughness: 0.05, // Very smooth, glass-like (reduced from 0.1)
+      metalness: 0.0,
+      emissive: new THREE.Color(debugConfig.emptyGlassTint), // Add emissive glow using tint color
+      emissiveIntensity: 0.4 // Bright glow for empty tiles
+    });
+
+    // Safe tile indicator material - green glow to show tiles that are safe to click
+    const matSafeIndicator = new THREE.MeshStandardMaterial({
+      color: debugConfig.hiddenColor,
+      roughness: 0.98,
+      metalness: 0.0,
+      side: THREE.FrontSide,
+      emissive: new THREE.Color(0x00ff00), // Green glow
+      emissiveIntensity: 0.3, // Moderate glow - clearly visible but not overwhelming
+      envMapIntensity: 0.0
+    });
+
+
+
+    const state = { f: debugConfig.tileDensity, polys: [], neighbors: [], tiles: [], firstClick: true, gameOver: false, won: false, safeRevealed: 0, totalMines: 0, flags: 0, lives: 3 };
+
+    let revealQueue = [];
+
+    let isRevealing = false;
+    
+    // Timer variables
+    let gameStartTime = null;
+    let elapsedTime = 0; // in seconds
+    let timerInterval = null;
+
+    let isInitialReveal = false;
+
+    let lifeLostInCurrentReveal = false;
+
+    // Audio setup
+
+    let audioContext = null;
+
+    const soundBuffers = { reveal: [], flag: [], gameOver: [] };
+
+    function initAudio(){
+
+      if (audioContext) return;
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+      document.addEventListener('click', ()=>{ if (audioContext && audioContext.state === 'suspended') audioContext.resume(); }, { once: true });
+
+    }
+
+    function generateBeep(frequency, duration, type = 'reveal', variant = 0){
+
+      if (!audioContext) initAudio();
+
+      const oscillator = audioContext.createOscillator();
+
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+
+      gainNode.connect(audioContext.destination);
+
+      if (type === 'reveal' || type === 'flag'){
+
+        // Clean, pleasant click sounds with 5 variants for both reveal and flagging
+        const clickVariants = [
+          { freq: 800, dur: 0.015, vol: 0.3, type: 'sine' },
+          { freq: 1000, dur: 0.012, vol: 0.35, type: 'sine' },
+          { freq: 1200, dur: 0.01, vol: 0.32, type: 'triangle' },
+          { freq: 600, dur: 0.018, vol: 0.28, type: 'sine' },
+          { freq: 900, dur: 0.014, vol: 0.33, type: 'triangle' }
+        ];
+
+        const v = clickVariants[variant] || clickVariants[0];
+
+        // Small random variation
+        oscillator.frequency.value = v.freq + Math.random() * 100 - 50;
+
+        oscillator.type = v.type;
+
+        // Soft attack and decay for pleasant sound
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+
+        gainNode.gain.linearRampToValueAtTime(debugConfig.soundVolume * v.vol, audioContext.currentTime + 0.002);
+
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + v.dur);
+
+        oscillator.start(audioContext.currentTime);
+
+        oscillator.stop(audioContext.currentTime + v.dur);
+
+        return;
+
+      } else if (type === 'gameOver'){
+
+        // Game over sounds with 5 different variants
+        const gameOverVariants = [
+          { freq: 200, dur: 0.5, vol: 0.4 },
+          { freq: 150, dur: 0.6, vol: 0.35 },
+          { freq: 250, dur: 0.4, vol: 0.45 },
+          { freq: 180, dur: 0.7, vol: 0.38 },
+          { freq: 220, dur: 0.5, vol: 0.42 }
+        ];
+
+        const v = gameOverVariants[variant] || gameOverVariants[0];
+
+        oscillator.frequency.value = v.freq;
+
+        oscillator.type = 'sawtooth';
+
+        gainNode.gain.setValueAtTime(debugConfig.soundVolume * v.vol, audioContext.currentTime);
+
+        oscillator.frequency.exponentialRampToValueAtTime(v.freq * 0.3, audioContext.currentTime + v.dur);
+
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + v.dur);
+
+        oscillator.start(audioContext.currentTime);
+
+        oscillator.stop(audioContext.currentTime + v.dur);
+
+        return;
+
+      }
+
+      // Fallback
+      oscillator.start(audioContext.currentTime);
+
+      oscillator.stop(audioContext.currentTime + duration);
+
+    }
+
+    function playSound(type){
+
+      if (!debugConfig.soundEnabled || !audioContext) return;
+
+      if (type === 'reveal'){
+
+        // Always use synthesized click variants (0-5)
+        const variant = debugConfig.revealSoundIndex - 1;
+
+        generateBeep(1000, 0.02, 'reveal', variant);
+
+        return;
+
+      } else if (type === 'flag'){
+
+        // Always use synthesized flag variants (0-5)
+        const variant = debugConfig.flagSoundIndex - 1;
+
+        generateBeep(600, 0.08, 'flag', variant);
+
+        return;
+
+      } else if (type === 'gameOver'){
+
+        // Always use synthesized game over variants (0-5)
+        const variant = debugConfig.gameOverSoundIndex - 1;
+
+        generateBeep(200, 0.5, 'gameOver', variant);
+
+        return;
+
+      }
+
+    }
+
+    function buildTiles() {
+
+      spherePivot.remove(wireGroup); wireGroup.clear(); wireGroup = new THREE.Group(); spherePivot.add(wireGroup);
+
+      spherePivot.remove(tileGroup); tileGroup.clear(); tileGroup = new THREE.Group(); spherePivot.add(tileGroup);
+
+      const wireHex = parseInt(debugConfig.wireHexColor.replace('#', ''), 16);
+
+      const wirePent = parseInt(debugConfig.wirePentColor.replace('#', ''), 16);
+
+      const { lines, pentLines } = buildEdgeLines(state.polys, wireHex, wirePent); wireGroup.add(lines); if (pentLines) wireGroup.add(pentLines);
+
+      state.tiles = state.polys.map((poly, i)=>{
+
+        const mesh = polygonToMesh(poly, matHidden);
+
+        const center = new THREE.Vector3(); poly.forEach(p=>center.add(p)); center.multiplyScalar(1/poly.length).normalize();
+
+        tileGroup.add(mesh);
+
+        return { index:i, mesh, center, mine:false, count:0, flagged:false, revealed:false, label:null, flagMaterial:null, isEmpty:false, adjacentGlowMaterial:null, safeIndicatorMaterial:null };
+
+      });
+
+      
+
+      // Mark tiles as empty based on emptyTileRatio, clustering them into groups of at least 3
+
+      const total = state.tiles.length;
+
+      const emptyTarget = Math.floor(total * debugConfig.emptyTileRatio / 100);
+
+      // Algorithm: grow empty clusters by starting from random seeds and expanding
+
+      const indices = [...state.tiles.keys()];
+
+      // Shuffle to randomize seed selection
+
+      for (let i=indices.length-1; i>0; i--){ const j=(Math.random()* (i+1))|0; [indices[i],indices[j]]=[indices[j],indices[i]]; }
+
+      const emptyIndices = new Set();
+
+      // Try to create clusters of at least 3 tiles
+
+      for (let seedIdx of indices) {
+
+        if (emptyIndices.size >= emptyTarget) break;
+
+        if (emptyIndices.has(seedIdx)) continue; // Already part of a cluster
+
+        // Start a new cluster with this seed
+
+        const cluster = [seedIdx];
+
+        emptyIndices.add(seedIdx);
+
+        // Try to expand cluster by adding neighbors
+
+        const queue = [seedIdx];
+
+        const visited = new Set([seedIdx]);
+
+        while (queue.length > 0 && cluster.length < 5 && emptyIndices.size < emptyTarget) {
+
+          const current = queue.shift();
+
+          for (const nb of state.neighbors[current]) {
+
+            if (visited.has(nb)) continue;
+
+            if (emptyIndices.size >= emptyTarget) break;
+
+            // 60% chance to add this neighbor to the cluster
+
+            if (Math.random() < 0.6) {
+
+              cluster.push(nb);
+
+              emptyIndices.add(nb);
+
+              queue.push(nb);
+
+              visited.add(nb);
+
+            }
+
+          }
+
+        }
+
+        // Ensure cluster has at least 3 tiles, otherwise remove it
+
+        if (cluster.length < 3) {
+
+          for (const idx of cluster) {
+
+            emptyIndices.delete(idx);
+
+          }
+
+        }
+
+      }
+
+      // Fill remaining empty tiles if we haven't reached the target
+
+      let remaining = emptyTarget - emptyIndices.size;
+
+      for (let idx of indices) {
+
+        if (remaining <= 0) break;
+
+        if (!emptyIndices.has(idx)) {
+
+          emptyIndices.add(idx);
+
+          remaining--;
+
+        }
+
+      }
+
+      // Apply empty status to all collected indices
+
+      for (const idx of emptyIndices) {
+
+        state.tiles[idx].isEmpty = true;
+
+        state.tiles[idx].mesh.material = matEmpty;
+
+      }
+
+    }
+
+
+
+    function placeMines(excludeIndex, ratioPercent){
+      const total = state.tiles.length; const mineTarget = Math.max(1, Math.floor(total * ratioPercent/100));
+
+      // Show loading overlay
+      showLoading('Generating board...');
+
+      // Use setTimeout to allow UI to update
+      setTimeout(() => {
+        // Try to generate a solvable board (max 3 attempts for faster loading)
+        let attempts = 0;
+        const maxAttempts = 3;
+        let boardIsSolvable = false;
+
+        const tryGenerateBoard = () => {
+          if (boardIsSolvable || attempts >= maxAttempts) {
+            // Done generating - hide loading
+            hideLoading();
+            continueBoardSetup();
+            return;
+          }
+
+          attempts++;
+          updateLoadingMessage(`Placing mines (attempt ${attempts}/${maxAttempts})...`);
+
+          setTimeout(() => {
+            state.totalMines = mineTarget; state.flags = 0; state.safeRevealed = 0; state.gameOver=false; state.won = false; state.lives = 3; lifeLostInCurrentReveal = false; hideGameOver(); updateCounters(); updateLives();
+
+            state.tiles.forEach(t=>{ t.mine=false; t.count=0; t.flagged=false; t.revealed=false; if (t.label){ tileGroup.remove(t.label); t.label.material.map.dispose(); t.label.material.dispose(); t.label=null; } if (t.flagMaterial){ t.flagMaterial.dispose(); t.flagMaterial=null; } if (t.adjacentGlowMaterial){ t.adjacentGlowMaterial.dispose(); t.adjacentGlowMaterial=null; } if (t.safeIndicatorMaterial){ t.safeIndicatorMaterial.dispose(); t.safeIndicatorMaterial=null; } t.mesh.material = t.isEmpty ? matEmpty : matHidden; });
+
+            const forbidden = excludeIndex >= 0 ? new Set([excludeIndex, ...state.neighbors[excludeIndex]]) : new Set();
+
+            let placed = 0; const indices = [...state.tiles.keys()].filter(i=>!forbidden.has(i) && !state.tiles[i].isEmpty);
+
+            for (let i=indices.length-1;i>0;i--){ const j=(Math.random()* (i+1))|0; [indices[i],indices[j]]=[indices[j],indices[i]]; }
+
+            // Place mines with light clustering - slight preference for clusters but mostly random
+            // This allows more isolated mines to prevent huge empty areas
+            const placedMines = new Set();
+            
+            // Place mines with light preference for clustering (40% chance to prefer near existing mines)
+            // but allow isolated mines (60% chance) to prevent huge empty areas
+            for (const idx of indices) { 
+              if (placed >= mineTarget) break;
+              
+              // Check if this position has a mine neighbor
+              let hasMineNeighbor = false;
+              if (placedMines.size > 0) {
+                for (const nb of state.neighbors[idx]) {
+                  if (placedMines.has(nb)) {
+                    hasMineNeighbor = true;
+                    break;
+                  }
+                }
+              }
+              
+              // If no mine neighbors, 60% chance to place anyway (allow isolated mines)
+              // Only 40% chance to skip and try to find a better position
+              if (!hasMineNeighbor && placedMines.size > 0 && Math.random() > 0.6) {
+                // Skip this position, try to find a better one near existing mines (max 2 attempts)
+                let foundBetter = false;
+                for (let attempt = 0; attempt < 2 && !foundBetter; attempt++) {
+                  const altIdx = indices[Math.floor(Math.random() * indices.length)];
+                  if (!placedMines.has(altIdx) && !forbidden.has(altIdx) && !state.tiles[altIdx].isEmpty) {
+                    // Check if this alternative has a mine neighbor
+                    for (const nb of state.neighbors[altIdx]) {
+                      if (placedMines.has(nb)) {
+                        state.tiles[altIdx].mine = true;
+                        placedMines.add(altIdx);
+                        placed++;
+                        foundBetter = true;
+                        break;
+                      }
+                    }
+                  }
+                }
+                // If we didn't find a better position, place here anyway (allow isolated mine)
+                if (!foundBetter) {
+                  state.tiles[idx].mine = true;
+                  placedMines.add(idx);
+                  placed++;
+                }
+              } else {
+                // Place mine here (either has neighbor or early in placement, or 60% chance for isolated)
+                state.tiles[idx].mine = true;
+                placedMines.add(idx);
+                placed++;
+              }
+            }
+
+            state.tiles.forEach((t,i)=>{ if (t.mine) return; let c=0; for (const nb of state.neighbors[i]) if (state.tiles[nb].mine) c++; t.count=c; });
+
+            // Reveal initial percentage of safe tiles at the start
+            const safeIndices = state.tiles.map((t, i) => i).filter(i => !state.tiles[i].mine && !state.tiles[i].isEmpty);
+            const revealCount = Math.max(1, Math.floor(safeIndices.length * debugConfig.initialRevealPercent / 100));
+
+            // Shuffle safe indices
+            for (let i = safeIndices.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [safeIndices[i], safeIndices[j]] = [safeIndices[j], safeIndices[i]];
+            }
+
+            // Reveal initial tiles for solvability check
+            const initialRevealed = new Set();
+            for (let i = 0; i < revealCount && i < safeIndices.length; i++) {
+              initialRevealed.add(safeIndices[i]);
+            }
+
+            updateLoadingMessage('Checking solvability...');
+
+            setTimeout(() => {
+              // Check if board is solvable from this initial state
+              // Temporarily mark tiles as revealed for solvability check
+              const originalRevealed = state.tiles.map(t => t.revealed);
+              initialRevealed.forEach(idx => { state.tiles[idx].revealed = true; });
+              
+              boardIsSolvable = isBoardSolvable();
+              
+              // Restore original revealed state
+              state.tiles.forEach((t, i) => { t.revealed = originalRevealed[i]; });
+              
+              if (!boardIsSolvable && attempts < maxAttempts) {
+                // Try again with different mine placement
+                tryGenerateBoard();
+              } else {
+                // Done generating - hide loading
+                hideLoading();
+                continueBoardSetup();
+              }
+            }, 10);
+          }, 10);
+        };
+
+        const continueBoardSetup = () => {
+          // Add initial tiles to reveal queue for one-by-one processing
+          const safeIndices = state.tiles.map((t, i) => i).filter(i => !state.tiles[i].mine && !state.tiles[i].isEmpty);
+          const revealCount = Math.max(1, Math.floor(safeIndices.length * debugConfig.initialRevealPercent / 100));
+          
+          // Shuffle safe indices for random initial reveal
+          for (let i = safeIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [safeIndices[i], safeIndices[j]] = [safeIndices[j], safeIndices[i]];
+          }
+
+          // Add to reveal queue
+          revealQueue = [];
+          for (let i = 0; i < revealCount && i < safeIndices.length; i++) {
+            revealQueue.push(safeIndices[i]);
+          }
+
+          // Start revealing tiles one by one
+          isInitialReveal = true;
+          processRevealQueue();
+          
+          // Start timer when game begins
+          startTimer();
+        };
+
+        tryGenerateBoard();
+      }, 50);
+    }
+
+
+
+    function revealSingle(i){
+
+      const t = state.tiles[i]; 
+      
+      // CRITICAL: Block reveal if right-click flagging just occurred
+      if (rightClickHandled || contextMenuHandled) {
+        return false;
+      }
+      
+      if (t.revealed || t.flagged || state.gameOver || t.isEmpty) return false;
+
+      t.revealed = true; t.mesh.material = t.mine? matMine : matRevealed;
+
+      if (t.mine){ 
+
+        if (!debugConfig.immortalMode) {
+
+          gameLost(i); 
+          
+          // Reveal the mine tile even if game continues
+          if (state.lives > 0) {
+            // Game continues, just reveal this mine
+            return true;
+          }
+
+          return false; 
+
+        }
+
+        // In immortal mode, reveal the mine but don't end the game
+
+        playSound('reveal');
+
+        return false;
+
+      }
+
+      state.safeRevealed++;
+
+      if (t.count>0){ addLabel(i, t.count); }
+
+      // Update heatmap for adjacent flagged tiles
+
+      updateAdjacentFlags(i);
+      
+      // Remove glow from this tile if it had any (now revealed)
+      if (t.adjacentGlowMaterial) {
+        t.adjacentGlowMaterial.dispose();
+        t.adjacentGlowMaterial = null;
+      }
+      
+
+      if (!isInitialReveal) {
+
+        playSound('reveal');
+
+      }
+
+      checkWin(); updateCounters();
+      
+      // Update safe tile indicators after revealing
+      updateSafeIndicators();
+
+      // If this tile has count 0, add adjacent safe tiles to reveal queue for one-by-one processing
+
+      if (t.count === 0) {
+
+        for (const nb of state.neighbors[i]) {
+
+          const neighbor = state.tiles[nb];
+
+          if (!neighbor.revealed && !neighbor.flagged && !neighbor.isEmpty && !neighbor.mine) {
+
+            // Add to queue instead of recursive call
+            if (!revealQueue.includes(nb)) {
+
+              revealQueue.push(nb);
+
+            }
+
+          }
+
+        }
+
+      }
+
+      return true;
+
+    }
+
+    function processRevealQueue(){
+
+      if (revealQueue.length === 0 || isRevealing) return;
+
+      isRevealing = true;
+
+      function revealNext(){
+
+        if (revealQueue.length === 0 || state.gameOver){
+
+          isRevealing = false;
+
+          isInitialReveal = false;
+
+          return;
+
+        }
+
+        const idx = revealQueue.shift();
+
+        if (idx === undefined){
+
+          isRevealing = false;
+
+          isInitialReveal = false;
+          
+          // After all reveals complete, check if player is stuck and auto-reveal a safe tile
+          setTimeout(() => {
+            checkIfStuckAndHelp();
+          }, 150);
+
+          return;
+
+        }
+
+        const t = state.tiles[idx];
+
+        if (!t.revealed && !t.flagged){
+
+          const success = revealSingle(idx);
+
+          if (success && t.count === 0){
+
+            for (const nb of state.neighbors[idx]){
+
+              if (!state.tiles[nb].revealed && !state.tiles[nb].flagged && !revealQueue.includes(nb)){
+
+                revealQueue.push(nb);
+
+              }
+
+            }
+
+          }
+
+        }
+
+        // Initial reveal should happen all at once (no delay)
+        if (isInitialReveal) {
+          revealNext();
+        } else {
+          setTimeout(revealNext, 8);
+        }
+
+      }
+
+      revealNext();
+
+    }
+
+    function reveal(i){
+
+      if (state.gameOver) return;
+      
+      // CRITICAL: Block reveal if right-click flagging just occurred (mouse) or touch flagging just occurred (touch)
+      if (rightClickHandled || contextMenuHandled || touchFlagHandled) {
+        return;
+      }
+
+      const t = state.tiles[i]; if (t.revealed || t.flagged) return;
+
+      if (!isRevealing && revealQueue.length === 0){
+
+        // Reset life loss flag for new reveal sequence
+        lifeLostInCurrentReveal = false;
+
+        revealQueue.push(i);
+
+        processRevealQueue();
+
+      } else {
+
+        if (!revealQueue.includes(i)) revealQueue.push(i);
+
+      }
+
+    }
+
+
+
+    function addLabel(i, n){
+
+      const t = state.tiles[i]; if (t.label) return;
+
+      const baseScale = labelScale(state.f);
+
+      const s = makeNumberPlane(n, baseScale * debugConfig.numberScale, t.center.clone().normalize());
+
+      s.position.copy(t.center).multiplyScalar(debugConfig.numberOffset);
+
+      tileGroup.add(s); t.label = s;
+
+    }
+
+    function updateLabels(){
+
+      state.tiles.forEach(t => {
+
+        if (t.label) {
+
+          const baseScale = labelScale(state.f);
+
+          const scale = baseScale * debugConfig.numberScale;
+
+          t.label.scale.set(scale, scale, 1);
+
+          t.label.position.copy(t.center).multiplyScalar(debugConfig.numberOffset);
+
+          // Update plane orientation to match tile surface
+
+          const centerNormal = t.center.clone().normalize();
+
+          // Get world position of label to check viewing angle
+
+          const worldPos = new THREE.Vector3();
+
+          t.label.getWorldPosition(worldPos);
+
+          // Calculate direction from label to camera
+
+          const dirToCamera = new THREE.Vector3().subVectors(camera.position, worldPos).normalize();
+
+          // Check if viewing from back side (camera direction opposite to tile normal)
+
+          const viewingFromBack = centerNormal.dot(dirToCamera) < 0;
+
+          const quaternion = new THREE.Quaternion();
+
+          quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), centerNormal);
+
+          t.label.quaternion.copy(quaternion);
+
+          // If viewing from back, rotate 180° around the tile normal to prevent mirroring
+
+          if (viewingFromBack) {
+
+            t.label.rotateOnAxis(centerNormal, Math.PI);
+
+          }
+
+          // Apply rotation offset if configured (rotate around the tile normal)
+
+          if (debugConfig.numberRotation !== 0) {
+
+            t.label.rotateOnAxis(centerNormal, debugConfig.numberRotation * (Math.PI / 180));
+
+          }
+
+          // Apply additional rotation offsets from debug panel (in local space after base orientation)
+
+          if (debugConfig.numberRotationX !== 0) {
+
+            const localAxisX = new THREE.Vector3(1, 0, 0);
+
+            localAxisX.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisX.normalize(), debugConfig.numberRotationX * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationY !== 0) {
+
+            const localAxisY = new THREE.Vector3(0, 1, 0);
+
+            localAxisY.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisY.normalize(), debugConfig.numberRotationY * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationZ !== 0) {
+
+            const localAxisZ = new THREE.Vector3(0, 0, 1);
+
+            localAxisZ.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisZ.normalize(), debugConfig.numberRotationZ * (Math.PI / 180));
+
+          }
+
+          // Update color by regenerating texture
+
+          const n = t.label.userData.number || t.count;
+
+          const texture = t.label.material.map;
+
+          const canvas = texture.image;
+
+          const ctx = canvas.getContext('2d');
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+          // Font size proportional to tile size (reuse baseScale from above)
+
+          const currentScale = baseScale * debugConfig.numberScale;
+
+          const fontSize = Math.max(96, Math.min(256, Math.round(192 * (currentScale / 0.12))));
+
+          ctx.font = `700 ${fontSize}px system-ui, Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+          // Add subtle glow effect
+          ctx.shadowColor = debugConfig.numberColor;
+          ctx.shadowBlur = Math.max(4, Math.round(fontSize / 20));
+          
+          ctx.fillStyle = debugConfig.numberColor;
+
+          ctx.fillText(String(n), canvas.width/2, canvas.height/2);
+          
+          // Reset shadow for other drawing operations
+          ctx.shadowBlur = 0;
+
+          texture.needsUpdate = true;
+
+        }
+
+      });
+
+    }
+
+
+
+    function calculateFlagHeat(flagIndex){
+
+      const t = state.tiles[flagIndex];
+
+      if (!t.flagged) return 0;
+
+      let heat = 0;
+
+      for (const nbIndex of state.neighbors[flagIndex]){
+
+        const neighbor = state.tiles[nbIndex];
+
+        if (neighbor.revealed && neighbor.count > 0){
+
+          heat += neighbor.count;
+
+        }
+
+      }
+
+      return heat;
+
+    }
+
+    function getFlagColorFromHeat(heat){
+
+      // Use user-selected flag color as base
+      // Heat ranges from 0 to ~24 (8 neighbors * 3 max each, but typically much lower)
+      // Normalize heat to 0-1 range (assuming max practical heat around 12)
+      const maxHeat = 12;
+      const heatFactor = Math.min(heat / maxHeat, 1);
+
+      // Parse base color from debugConfig.flagColor (hex format: #RRGGBB)
+      const baseColor = debugConfig.flagColor.replace('#', '');
+      const baseR = parseInt(baseColor.substr(0, 2), 16);
+      const baseG = parseInt(baseColor.substr(2, 2), 16);
+      const baseB = parseInt(baseColor.substr(4, 2), 16);
+
+      // Higher heat = darker (lower RGB values)
+      // Invert: higher heatFactor → lower intensity → darker color
+      const intensity = 1.0 - (heatFactor * 0.7); // 1.0 to 0.3 (inverted) - more dramatic contrast
+
+      const r = Math.floor(baseR * intensity);
+      const g = Math.floor(baseG * intensity);
+      const b = Math.floor(baseB * intensity);
+
+      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+
+    }
+
+    function updateFlagMaterial(i){
+
+      const t = state.tiles[i];
+
+      if (!t.flagged) return;
+
+      // Reduce saturation of flag color for easier viewing
+      // Convert flag color to desaturated version
+      const flagColor = debugConfig.flagColor.replace('#', '');
+      const r = parseInt(flagColor.substr(0, 2), 16);
+      const g = parseInt(flagColor.substr(2, 2), 16);
+      const b = parseInt(flagColor.substr(4, 2), 16);
+      
+      // Convert RGB to HSL for desaturation
+      const rNorm = r / 255;
+      const gNorm = g / 255;
+      const bNorm = b / 255;
+      const max = Math.max(rNorm, gNorm, bNorm);
+      const min = Math.min(rNorm, gNorm, bNorm);
+      const l = (max + min) / 2;
+      let h, s;
+      if (max === min) {
+        h = s = 0;
+      } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === rNorm) {
+          h = ((gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0)) / 6;
+        } else if (max === gNorm) {
+          h = ((bNorm - rNorm) / d + 2) / 6;
+        } else {
+          h = ((rNorm - gNorm) / d + 4) / 6;
+        }
+      }
+      
+      // Reduce saturation by 50% for less harsh colors
+      s = s * 0.5;
+      
+      // Convert back to RGB
+      const hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+      
+      let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      let p = 2 * l - q;
+      const desatR = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+      const desatG = Math.round(hue2rgb(p, q, h) * 255);
+      const desatB = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+      
+      const desaturatedColor = `#${desatR.toString(16).padStart(2,'0')}${desatG.toString(16).padStart(2,'0')}${desatB.toString(16).padStart(2,'0')}`;
+
+      if (!t.flagMaterial){
+
+        t.flagMaterial = new THREE.MeshStandardMaterial({ 
+          color: desaturatedColor, 
+          emissive: new THREE.Color(0x000000), // No glow
+          emissiveIntensity: 0.0, // No glow
+          roughness: matFlag.roughness, 
+          metalness: matFlag.metalness 
+        });
+
+      } else {
+
+        t.flagMaterial.color.set(desaturatedColor);
+        t.flagMaterial.emissive.set(0x000000); // No glow
+        t.flagMaterial.emissiveIntensity = 0.0; // No glow
+
+      }
+
+      t.mesh.material = t.flagMaterial;
+
+    }
+
+    function updateAdjacentFlags(i){
+
+      // When a tile is revealed, update all adjacent flagged tiles
+
+      for (const nbIndex of state.neighbors[i]){
+
+        const neighbor = state.tiles[nbIndex];
+
+        if (neighbor.flagged){
+
+          updateFlagMaterial(nbIndex);
+
+        }
+
+      }
+
+    }
+
+    // Function to determine if a tile is safe to click (all adjacent mines are flagged)
+    // Only shows indicator when safe but NOT obviously deducible from numbered tiles
+    function isTileSafe(tileIndex) {
+      const t = state.tiles[tileIndex];
+      
+      // Already revealed, flagged, empty, or is a mine - not applicable
+      if (t.revealed || t.flagged || t.isEmpty || t.mine) {
+        return false;
+      }
+      
+      // Check if safety is obvious from any adjacent numbered tile
+      // (where all mines are flagged - making remaining tiles obviously safe)
+      let isObvious = false;
+      for (const nbIndex of state.neighbors[tileIndex]) {
+        const neighbor = state.tiles[nbIndex];
+        
+        // If neighbor is revealed and has a number (count > 0)
+        if (neighbor.revealed && neighbor.count > 0) {
+          // Count how many adjacent tiles to this neighbor are flagged
+          let flaggedCount = 0;
+          for (const nb2Index of state.neighbors[nbIndex]) {
+            if (state.tiles[nb2Index].flagged) {
+              flaggedCount++;
+            }
+          }
+          
+          // If all mines around this numbered tile are flagged,
+          // then safety is obvious from this numbered tile
+          if (flaggedCount === neighbor.count) {
+            isObvious = true;
+            break;
+          }
+        }
+      }
+      
+      // Don't show indicator if it's obvious - player can deduce it themselves
+      return false;
+    }
+
+    // Function to find and flag obvious mines (tiles where all adjacent safe tiles are revealed)
+    function flagObviousMines() {
+      let totalFlagged = 0;
+      
+      // Check all revealed numbered tiles
+      for (let i = 0; i < state.tiles.length; i++) {
+        const t = state.tiles[i];
+        
+        // Skip if not revealed or has no number
+        if (!t.revealed || t.count === 0) continue;
+        
+        // Count how many adjacent tiles are flagged
+        let adjacentFlaggedCount = 0;
+        const unrevealedNeighbors = [];
+        
+        for (const nbIndex of state.neighbors[i]) {
+          const neighbor = state.tiles[nbIndex];
+          if (neighbor.flagged) {
+            adjacentFlaggedCount++;
+          } else if (!neighbor.revealed && !neighbor.isEmpty) {
+            unrevealedNeighbors.push(nbIndex);
+          }
+        }
+        
+        // If (count - flaggedCount) equals unrevealedNeighbors.length,
+        // then all unrevealed neighbors must be mines
+        const remainingMines = t.count - adjacentFlaggedCount;
+        
+        if (remainingMines > 0 && remainingMines === unrevealedNeighbors.length) {
+          // All remaining unrevealed neighbors must be mines - flag them
+          for (const nbIndex of unrevealedNeighbors) {
+            const neighbor = state.tiles[nbIndex];
+            if (!neighbor.flagged && !neighbor.revealed && !neighbor.isEmpty) {
+              neighbor.flagged = true;
+              updateFlagMaterial(nbIndex);
+              totalFlagged++;
+            }
+          }
+        }
+      }
+      
+      if (totalFlagged > 0) {
+        state.flags += totalFlagged;
+        updateCounters();
+        updateSafeIndicators();
+      }
+      
+      return totalFlagged;
+    }
+
+    // Function to update safe tile indicators for all tiles
+    function updateSafeIndicators() {
+      for (let i = 0; i < state.tiles.length; i++) {
+        const t = state.tiles[i];
+        
+        // Skip if already revealed, flagged, empty, or is a mine
+        if (t.revealed || t.flagged || t.isEmpty || t.mine) {
+          // Clean up safe indicator if it exists
+          if (t.safeIndicatorMaterial) {
+            t.safeIndicatorMaterial.dispose();
+            t.safeIndicatorMaterial = null;
+          }
+          continue;
+        }
+        
+        const isSafe = isTileSafe(i);
+        
+        if (isSafe) {
+          // Apply safe indicator material
+          if (!t.safeIndicatorMaterial) {
+            t.safeIndicatorMaterial = matSafeIndicator.clone();
+            t.safeIndicatorMaterial.color.set(debugConfig.hiddenColor);
+          }
+          if (t.mesh.material !== t.safeIndicatorMaterial) {
+            t.mesh.material = t.safeIndicatorMaterial;
+          }
+        } else {
+          // Remove safe indicator if it exists
+          if (t.safeIndicatorMaterial) {
+            t.safeIndicatorMaterial.dispose();
+            t.safeIndicatorMaterial = null;
+            // Restore to hidden material
+            t.mesh.material = t.isEmpty ? matEmpty : matHidden;
+          }
+        }
+      }
+    }
+    
+    // Function to update adjacent tiles with light bleed from flagged tiles
+    function updateAdjacentGlow(i) {
+      const t = state.tiles[i];
+      
+      // Count how many flagged neighbors this tile has
+      let flaggedNeighbors = 0;
+      for (const nbIndex of state.neighbors[i]) {
+        if (state.tiles[nbIndex].flagged) {
+          flaggedNeighbors++;
+        }
+      }
+      
+      // Update all neighbors of this tile
+      for (const nbIndex of state.neighbors[i]) {
+        const neighbor = state.tiles[nbIndex];
+        
+        // Skip if neighbor is flagged, revealed, empty, or is a mine
+        if (neighbor.flagged || neighbor.revealed || neighbor.isEmpty || neighbor.mine) {
+          continue;
+        }
+        
+        // Count flagged neighbors around this neighbor
+        let neighborFlaggedCount = 0;
+        for (const nb2Index of state.neighbors[nbIndex]) {
+          if (state.tiles[nb2Index].flagged) {
+            neighborFlaggedCount++;
+          }
+        }
+        
+        // Calculate glow intensity based on number of flagged neighbors (more flags = more glow)
+        const glowIntensity = Math.min(0.4, neighborFlaggedCount * 0.15); // Max 0.4 intensity
+        
+        if (glowIntensity > 0) {
+          // Get the flag color for glow
+          const flagColor = debugConfig.flagColor.replace('#', '');
+          const flagR = parseInt(flagColor.substr(0, 2), 16);
+          const flagG = parseInt(flagColor.substr(2, 2), 16);
+          const flagB = parseInt(flagColor.substr(4, 2), 16);
+          
+          // Desaturate the flag color for subtle glow
+          const rNorm = flagR / 255;
+          const gNorm = flagG / 255;
+          const bNorm = flagB / 255;
+          const max = Math.max(rNorm, gNorm, bNorm);
+          const min = Math.min(rNorm, gNorm, bNorm);
+          const l = (max + min) / 2;
+          let h, s;
+          if (max === min) {
+            h = s = 0;
+          } else {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            if (max === rNorm) {
+              h = ((gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0)) / 6;
+            } else if (max === gNorm) {
+              h = ((bNorm - rNorm) / d + 2) / 6;
+            } else {
+              h = ((rNorm - gNorm) / d + 4) / 6;
+            }
+          }
+          // Reduce saturation for subtle glow
+          s = s * 0.3;
+          
+          // Convert back to RGB
+          const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+          };
+          
+          let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          let p = 2 * l - q;
+          const glowR = Math.round(hue2rgb(p, q, h + 1/3) * 255 * 0.4);
+          const glowG = Math.round(hue2rgb(p, q, h) * 255 * 0.4);
+          const glowB = Math.round(hue2rgb(p, q, h - 1/3) * 255 * 0.4);
+          
+          const glowColor = `#${glowR.toString(16).padStart(2,'0')}${glowG.toString(16).padStart(2,'0')}${glowB.toString(16).padStart(2,'0')}`;
+          
+          // Create or update glow material for adjacent tiles
+          if (!neighbor.adjacentGlowMaterial) {
+            // Clone the base material and add emissive glow
+            const baseColor = neighbor.mesh.material.color.clone();
+            neighbor.adjacentGlowMaterial = neighbor.mesh.material.clone();
+            neighbor.adjacentGlowMaterial.emissive = new THREE.Color(glowColor);
+            neighbor.adjacentGlowMaterial.emissiveIntensity = glowIntensity;
+            neighbor.mesh.material = neighbor.adjacentGlowMaterial;
+          } else {
+            // Update existing glow material
+            neighbor.adjacentGlowMaterial.emissive.set(glowColor);
+            neighbor.adjacentGlowMaterial.emissiveIntensity = glowIntensity;
+          }
+        } else {
+          // No flagged neighbors, remove glow
+          if (neighbor.adjacentGlowMaterial) {
+            neighbor.adjacentGlowMaterial.dispose();
+            neighbor.adjacentGlowMaterial = null;
+            // Restore base material
+            if (neighbor.revealed) {
+              neighbor.mesh.material = matRevealed;
+            } else {
+              neighbor.mesh.material = matHidden;
+            }
+          }
+        }
+      }
+    }
+
+    function toggleFlag(i){ 
+
+      const t = state.tiles[i]; 
+
+      if (t.revealed || state.gameOver) return; 
+
+      t.flagged = !t.flagged; 
+
+      if (t.flagged){
+
+        updateFlagMaterial(i);
+
+      } else {
+
+        if (t.flagMaterial){
+
+          t.flagMaterial.dispose();
+
+          t.flagMaterial = null;
+
+        }
+
+        t.mesh.material = matHidden;
+        
+        // Remove glow from adjacent tiles when flag is removed
+        for (const nbIndex of state.neighbors[i]) {
+          const neighbor = state.tiles[nbIndex];
+          if (neighbor.adjacentGlowMaterial) {
+            neighbor.adjacentGlowMaterial.dispose();
+            neighbor.adjacentGlowMaterial = null;
+            // Restore base material
+            if (neighbor.revealed) {
+              neighbor.mesh.material = matRevealed;
+            } else {
+              neighbor.mesh.material = matHidden;
+            }
+          }
+        }
+
+      }
+
+      state.flags += t.flagged ? 1 : -1; 
+
+      playSound('flag'); 
+
+      updateCounters();
+      
+      // Update safe tile indicators after flagging/unflagging
+      updateSafeIndicators(); 
+      
+      // After flagging, check if player is stuck and auto-reveal a safe tile
+      setTimeout(() => {
+        checkIfStuckAndHelp();
+      }, 150);
+
+    }
+
+
+
+    function chord(i){ const t = state.tiles[i]; if (!t.revealed || state.gameOver) return; const flagsAround = state.neighbors[i].reduce((acc,nb)=> acc + (state.tiles[nb].flagged?1:0),0); if (flagsAround === t.count){ for (const nb of state.neighbors[i]) if (!state.tiles[nb].flagged && !state.tiles[nb].revealed) reveal(nb); } }
+
+    // Find a safe tile to reveal when player is stuck (no logical moves available)
+    function findSafeTile(){
+      const revealed = new Set(state.tiles.map((t, i) => t.revealed ? i : -1).filter(i => i >= 0));
+      const flagged = new Set(state.tiles.map((t, i) => t.flagged ? i : -1).filter(i => i >= 0));
+      
+      // Try to find a safe tile using the same logic as solvability checker
+      let foundNewSafe = true;
+      let iterations = 0;
+      const maxIterations = 200;
+      
+      while (foundNewSafe && iterations < maxIterations) {
+        iterations++;
+        foundNewSafe = false;
+        
+        // Cascade reveal all tiles with count 0
+        let cascadeFound = true;
+        while (cascadeFound) {
+          cascadeFound = false;
+          for (const tileIdx of revealed) {
+            const t = state.tiles[tileIdx];
+            if (t.count === 0) {
+              const neighbors = state.neighbors[tileIdx];
+              for (const nb of neighbors) {
+                if (!revealed.has(nb) && !flagged.has(nb) && !state.tiles[nb].isEmpty && !state.tiles[nb].mine) {
+                  revealed.add(nb);
+                  cascadeFound = true;
+                  foundNewSafe = true;
+                }
+              }
+            }
+          }
+        }
+        
+        // Check each revealed tile for deductions
+        for (const tileIdx of revealed) {
+          const t = state.tiles[tileIdx];
+          if (t.count === 0) continue;
+          
+          const neighbors = state.neighbors[tileIdx];
+          const hiddenNeighbors = neighbors.filter(nb => !revealed.has(nb) && !flagged.has(nb) && !state.tiles[nb].isEmpty);
+          const flaggedNeighbors = neighbors.filter(nb => flagged.has(nb));
+          
+          const remainingMines = t.count - flaggedNeighbors.length;
+          
+          // If all mines are flagged, remaining neighbors must be safe
+          if (remainingMines === 0 && hiddenNeighbors.length > 0) {
+            // Return the first safe tile found
+            for (const nb of hiddenNeighbors) {
+              if (!state.tiles[nb].mine) {
+                return nb;
+              }
+            }
+          }
+        }
+      }
+      
+      // If no safe tile found logically, return null (player must guess)
+      return null;
+    }
+
+    // Check if player is stuck and auto-reveal a safe tile
+    function checkIfStuckAndHelp(){
+      if (state.gameOver || state.won) return;
+      
+      // Find a safe tile
+      const safeTile = findSafeTile();
+      
+      if (safeTile !== null && !state.tiles[safeTile].revealed) {
+        // Auto-reveal the safe tile
+        reveal(safeTile);
+        return true;
+      }
+      
+      return false;
+    }
+
+    // Check if the current board state is solvable without guessing (optimized for speed)
+    function isBoardSolvable(){
+      // Create a snapshot of current state for solving simulation
+      const revealed = new Set(state.tiles.map((t, i) => t.revealed ? i : -1).filter(i => i >= 0));
+      const flagged = new Set(state.tiles.map((t, i) => t.flagged ? i : -1).filter(i => i >= 0));
+      const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length;
+      
+      // Early exit: if we've revealed a good percentage, consider it solvable
+      const minSolvablePercent = 0.7; // If we can solve 70%+, consider it good enough
+      const minSolvable = Math.floor(totalSafe * minSolvablePercent);
+      
+      // Simulate solving until we can't find more safe moves
+      let foundNewSafe = true;
+      let iterations = 0;
+      const maxIterations = 200; // Reduced from 2000 for faster checks
+      
+      while (foundNewSafe && revealed.size < totalSafe && iterations < maxIterations) {
+        iterations++;
+        foundNewSafe = false;
+        
+        // First, cascade reveal all tiles with count 0 (they reveal all neighbors)
+        let cascadeFound = true;
+        let cascadeIterations = 0;
+        while (cascadeFound && cascadeIterations < 50) { // Limit cascade iterations
+          cascadeIterations++;
+          cascadeFound = false;
+          for (const tileIdx of revealed) {
+            const t = state.tiles[tileIdx];
+            if (t.count === 0) {
+              const neighbors = state.neighbors[tileIdx];
+              for (const nb of neighbors) {
+                if (!revealed.has(nb) && !flagged.has(nb) && !state.tiles[nb].isEmpty && !state.tiles[nb].mine) {
+                  revealed.add(nb);
+                  cascadeFound = true;
+                  foundNewSafe = true;
+                }
+              }
+            }
+          }
+        }
+        
+        // Check each revealed tile for basic deductions (fast path)
+        for (const tileIdx of revealed) {
+          const t = state.tiles[tileIdx];
+          if (t.count === 0) continue;
+          
+          const neighbors = state.neighbors[tileIdx];
+          const hiddenNeighbors = neighbors.filter(nb => !revealed.has(nb) && !flagged.has(nb) && !state.tiles[nb].isEmpty);
+          const flaggedNeighbors = neighbors.filter(nb => flagged.has(nb));
+          
+          const remainingMines = t.count - flaggedNeighbors.length;
+          const remainingHidden = hiddenNeighbors.length;
+          
+          // If all mines are flagged, remaining neighbors must be safe
+          if (remainingMines === 0 && remainingHidden > 0) {
+            foundNewSafe = true;
+            for (const nb of hiddenNeighbors) {
+              if (!state.tiles[nb].mine) {
+                revealed.add(nb);
+              }
+            }
+          }
+          
+          // If remaining hidden neighbors == remaining mines needed, all must be mines
+          if (remainingMines === remainingHidden && remainingHidden > 0) {
+            for (const nb of hiddenNeighbors) {
+              if (state.tiles[nb].mine && !flagged.has(nb)) {
+                flagged.add(nb);
+                foundNewSafe = true; // This might unlock other deductions
+              }
+            }
+          }
+        }
+        
+        // Early exit if we've reached a good solvable percentage
+        if (revealed.size >= minSolvable) {
+          return true;
+        }
+      }
+      
+      // Consider solvable if we've revealed a good percentage (optimistic approach)
+      return revealed.size >= minSolvable;
+    }
+
+
+
+    function gameLost(){ 
+      if (debugConfig.immortalMode) return;
+      
+      // Only lose one life per reveal sequence (click)
+      if (lifeLostInCurrentReveal) return;
+      
+      lifeLostInCurrentReveal = true;
+      state.lives--;
+      updateLives();
+      
+      if (state.lives <= 0) {
+        state.gameOver = true;
+        state.won = false;
+        stopTimer(); // Stop timer on game over
+        playSound('gameOver');
+        state.tiles.forEach((t)=>{ 
+          if (t.mine){ 
+            t.mesh.material = matMine; 
+            if (!t.revealed) { 
+              t.revealed = true; 
+            } 
+          } 
+        });
+        showGameOver();
+      } else {
+        // Just reveal the mine that was hit, but don't end the game
+        playSound('gameOver');
+      }
+    }
+    
+    function updateLives(){
+      for (let i = 1; i <= 3; i++) {
+        const heart = document.getElementById(`heart${i}`);
+        if (heart) {
+          if (i <= state.lives) {
+            heart.classList.remove('empty');
+          } else {
+            heart.classList.add('empty');
+          }
+        }
+      }
+    }
+
+    function showGameOver(){
+      const overlay = document.getElementById('gameOverOverlay');
+      const title = document.getElementById('gameOverTitle');
+      const subtitle = document.getElementById('gameOverSubtitle');
+      const mineHuntStat = document.getElementById('statMineHunt');
+      const explorationStat = document.getElementById('statExploration');
+      const flagsStat = document.getElementById('statFlags');
+      const revealedStat = document.getElementById('statRevealed');
+
+      if (!overlay) return;
+
+      // Update title and subtitle based on win/loss
+      if (state.won) {
+        title.textContent = 'Victory!';
+        title.className = 'game-over-title win';
+        subtitle.textContent = 'You cleared all safe tiles!';
+      } else {
+        title.textContent = 'Game Over';
+        title.className = 'game-over-title loss';
+        subtitle.textContent = 'You ran out of lives';
+      }
+
+      // Calculate stats
+      const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length;
+      const minePercent = state.totalMines > 0 ? Math.round((state.flags / state.totalMines) * 100) : 0;
+      const explorePercent = totalSafe > 0 ? Math.round((state.safeRevealed / totalSafe) * 100) : 0;
+
+      // Update stat values
+      mineHuntStat.textContent = `${minePercent}%`;
+      explorationStat.textContent = `${explorePercent}%`;
+      flagsStat.textContent = `${state.flags}/${state.totalMines}`;
+      revealedStat.textContent = `${state.safeRevealed}/${totalSafe}`;
+
+      // Show overlay
+      overlay.classList.add('visible');
+    }
+
+    function hideGameOver(){
+      const overlay = document.getElementById('gameOverOverlay');
+      if (overlay) {
+        overlay.classList.remove('visible');
+      }
+    }
+
+    function showLoading(message){
+      const overlay = document.getElementById('loadingOverlay');
+      const messageEl = document.getElementById('loadingMessage');
+      if (overlay) {
+        overlay.classList.add('visible');
+      }
+      if (messageEl && message) {
+        messageEl.textContent = message;
+      }
+    }
+
+    function hideLoading(){
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.classList.remove('visible');
+      }
+    }
+
+    function updateLoadingMessage(message){
+      const messageEl = document.getElementById('loadingMessage');
+      if (messageEl) {
+        messageEl.textContent = message;
+      }
+    }
+
+
+
+    function checkWin(){ const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length; if (state.safeRevealed >= totalSafe){ state.gameOver = true; state.won = true; stopTimer(); showGameOver(); } }
+
+
+
+    // Timer functions
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    function updateTimer() {
+      const timerValueEl = document.getElementById('timerValue');
+      if (timerValueEl) {
+        timerValueEl.textContent = formatTime(elapsedTime);
+      }
+    }
+    
+    function startTimer() {
+      if (timerInterval) return; // Already running
+      gameStartTime = Date.now();
+      timerInterval = setInterval(() => {
+        if (gameStartTime) {
+          elapsedTime = Math.floor((Date.now() - gameStartTime) / 1000);
+          updateTimer();
+        }
+      }, 1000);
+    }
+    
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      // Update final elapsed time
+      if (gameStartTime) {
+        elapsedTime = Math.floor((Date.now() - gameStartTime) / 1000);
+        updateTimer();
+      }
+    }
+    
+    function resetTimer() {
+      stopTimer();
+      gameStartTime = null;
+      elapsedTime = 0;
+      updateTimer();
+    }
+
+    function updateCounters(){ 
+      // Update scoreboard
+      // Calculate total safe tiles (excluding mines and empty tiles)
+      const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length;
+      
+      // Mine Hunt: flags / totalMines
+      const minePercent = state.totalMines > 0 ? Math.round((state.flags / state.totalMines) * 100) : 0;
+      const mineProgress = document.getElementById('mineProgress');
+      const minePercentEl = document.getElementById('minePercent');
+      const mineFractionEl = document.getElementById('mineFraction');
+      if (mineProgress) {
+        const circumference = 2 * Math.PI * 45; // SVG units (viewBox radius), not pixels
+        const offset = circumference - (minePercent / 100) * circumference;
+        mineProgress.style.strokeDashoffset = offset;
+      }
+      if (minePercentEl) minePercentEl.innerHTML = `${minePercent}<small>%</small>`;
+      if (mineFractionEl) mineFractionEl.textContent = `${state.flags}/${state.totalMines}`;
+      
+      // Exploration: safeRevealed / totalSafe (empty tiles excluded)
+      const explorePercent = totalSafe > 0 ? Math.round((state.safeRevealed / totalSafe) * 100) : 0;
+      const exploreProgress = document.getElementById('exploreProgress');
+      const explorePercentEl = document.getElementById('explorePercent');
+      const exploreFractionEl = document.getElementById('exploreFraction');
+      if (exploreProgress) {
+        const circumference = 2 * Math.PI * 45; // SVG units (viewBox radius), not pixels
+        const offset = circumference - (explorePercent / 100) * circumference;
+        exploreProgress.style.strokeDashoffset = offset;
+      }
+      if (explorePercentEl) explorePercentEl.innerHTML = `${explorePercent}<small>%</small>`;
+      if (exploreFractionEl) exploreFractionEl.textContent = `${state.safeRevealed}/${totalSafe}`;
+    }
+
+
+
+    // Helper function to ensure revealed tiles have better contrast with hidden tiles
+    function adjustRevealedForContrast(hiddenColor, revealedColor) {
+      // Parse colors
+      const hiddenHex = hiddenColor.replace('#', '');
+      const revealedHex = revealedColor.replace('#', '');
+      const hiddenR = parseInt(hiddenHex.substr(0, 2), 16);
+      const hiddenG = parseInt(hiddenHex.substr(2, 2), 16);
+      const hiddenB = parseInt(hiddenHex.substr(4, 2), 16);
+      const revealedR = parseInt(revealedHex.substr(0, 2), 16);
+      const revealedG = parseInt(revealedHex.substr(2, 2), 16);
+      const revealedB = parseInt(revealedHex.substr(4, 2), 16);
+      
+      // Calculate luminance (relative brightness)
+      const getLuminance = (r, g, b) => {
+        const [rs, gs, bs] = [r, g, b].map(c => {
+          c = c / 255;
+          return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+      };
+      
+      const hiddenLum = getLuminance(hiddenR, hiddenG, hiddenB);
+      const revealedLum = getLuminance(revealedR, revealedG, revealedB);
+      
+      // Calculate contrast ratio
+      const contrast = (Math.max(hiddenLum, revealedLum) + 0.05) / (Math.min(hiddenLum, revealedLum) + 0.05);
+      
+      // If contrast is too low (< 1.3), adjust revealed color to be more distinct
+      // Target contrast ratio: ~1.4-1.6 (subtle but noticeable)
+      if (contrast < 1.4) {
+        const targetContrast = 1.5;
+        const isRevealedLighter = revealedLum > hiddenLum;
+        
+        // Calculate target luminance
+        let targetLum;
+        if (isRevealedLighter) {
+          targetLum = (hiddenLum + 0.05) * targetContrast - 0.05;
+        } else {
+          targetLum = (hiddenLum + 0.05) / targetContrast - 0.05;
+        }
+        targetLum = Math.max(0, Math.min(1, targetLum));
+        
+        // Adjust RGB values proportionally to reach target luminance
+        const currentLum = revealedLum;
+        const ratio = currentLum > 0 ? targetLum / currentLum : 1;
+        
+        // Apply adjustment with some color preservation
+        const adjustR = Math.min(255, Math.max(0, Math.round(revealedR * ratio * 0.7 + revealedR * 0.3)));
+        const adjustG = Math.min(255, Math.max(0, Math.round(revealedG * ratio * 0.7 + revealedG * 0.3)));
+        const adjustB = Math.min(255, Math.max(0, Math.round(revealedB * ratio * 0.7 + revealedB * 0.3)));
+        
+        return `#${adjustR.toString(16).padStart(2,'0')}${adjustG.toString(16).padStart(2,'0')}${adjustB.toString(16).padStart(2,'0')}`;
+      }
+      
+      // Contrast is good enough, return original
+      return revealedColor;
+    }
+
+    function updateMaterials(){
+
+      matHidden.color.set(debugConfig.hiddenColor);
+      // Keep hidden tiles very matte and non-reflective - darker for distinction
+      matHidden.roughness = 0.98;
+      matHidden.metalness = 0.0;
+      matHidden.emissive.set(0x080808); // Updated to match new darker value
+      matHidden.emissiveIntensity = 0.05; // Updated to match new lower value
+      matHidden.envMapIntensity = 0.0;
+
+      // Adjust revealed color for better contrast while keeping it close to hidden
+      const adjustedRevealedColor = adjustRevealedForContrast(debugConfig.hiddenColor, debugConfig.revealedColor);
+      matRevealed.color.set(adjustedRevealedColor);
+      // Make revealed tiles glossy and reflective for better separation - more distinct
+      matRevealed.roughness = 0.2; // Updated to match new smoother value
+      matRevealed.metalness = 0.2; // Updated to match new more metallic value
+      matRevealed.emissive.set(0x666666); // Updated to match new brighter value
+      matRevealed.emissiveIntensity = 0.5; // Updated to match new higher value
+      matRevealed.envMapIntensity = 1.2; // Updated to match new higher value
+
+      matFlag.color.set(debugConfig.flagColor);
+
+      matMine.color.set(debugConfig.mineColor);
+
+      matMine.emissive.set(debugConfig.mineEmissive);
+
+      // Update all flagged tiles to recalculate heatmap with new flag color
+
+      state.tiles.forEach((t, i) => {
+
+        if (t.isEmpty) { t.mesh.material = matEmpty; }
+
+        else if (t.revealed) { 
+          // Remove glow if revealed
+          if (t.adjacentGlowMaterial) {
+            t.adjacentGlowMaterial.dispose();
+            t.adjacentGlowMaterial = null;
+          }
+          t.mesh.material = t.mine ? matMine : matRevealed; 
+        }
+
+        else if (t.flagged) { 
+
+          // Force recalculation of flag material when flag color changes
+
+          if (t.flagMaterial) {
+
+            t.flagMaterial.dispose();
+
+            t.flagMaterial = null;
+
+          }
+
+          updateFlagMaterial(i);
+
+        }
+
+        else { 
+          // Remove any existing glow material
+          if (t.adjacentGlowMaterial) {
+            t.adjacentGlowMaterial.dispose();
+            t.adjacentGlowMaterial = null;
+          }
+          t.mesh.material = matHidden; 
+        }
+
+      });
+      
+      // Remove all existing glow materials when palette changes
+      state.tiles.forEach((t, i) => {
+        if (t.adjacentGlowMaterial) {
+          t.adjacentGlowMaterial.dispose();
+          t.adjacentGlowMaterial = null;
+          // Restore base material
+          if (t.revealed) {
+            t.mesh.material = matRevealed;
+          } else if (!t.flagged && !t.isEmpty) {
+            t.mesh.material = matHidden;
+          }
+        }
+      });
+
+    }
+
+
+
+    function updateWireframe(){
+
+      spherePivot.remove(wireGroup); wireGroup.clear(); wireGroup = new THREE.Group(); spherePivot.add(wireGroup);
+
+      const wireHex = parseInt(debugConfig.wireHexColor.replace('#', ''), 16);
+
+      const wirePent = parseInt(debugConfig.wirePentColor.replace('#', ''), 16);
+
+      const { lines, pentLines } = buildEdgeLines(state.polys, wireHex, wirePent);
+
+      wireGroup.add(lines); if (pentLines) wireGroup.add(pentLines);
+
+    }
+
+    function updateCamera(){
+
+      camera.fov = debugConfig.cameraFOV;
+
+      camera.near = debugConfig.cameraNear;
+
+      camera.far = debugConfig.cameraFar;
+
+      camera.position.set(debugConfig.cameraX, debugConfig.cameraY, debugConfig.cameraZ);
+
+      camera.updateProjectionMatrix();
+
+      // Camera is fixed, no controls.update() needed
+
+    }
+
+    function updateFog(){
+      if (debugConfig.fogEnabled && scene.fog) {
+        scene.fog.near = debugConfig.fogNear;
+        scene.fog.far = debugConfig.fogFar;
+      } else if (!debugConfig.fogEnabled && scene.fog) {
+        scene.fog = null;
+      } else if (debugConfig.fogEnabled && !scene.fog) {
+        scene.fog = new THREE.Fog(new THREE.Color(debugConfig.backgroundColor), debugConfig.fogNear, debugConfig.fogFar);
+      }
+    }
+
+    function updateLights(){
+
+      keyLight.color.set(debugConfig.keyLightColor);
+
+      keyLight.intensity = debugConfig.keyLightIntensity;
+
+      keyLight.position.set(debugConfig.keyLightX, debugConfig.keyLightY, debugConfig.keyLightZ);
+
+      rimLight.color.set(debugConfig.rimLightColor);
+
+      rimLight.position.set(debugConfig.rimLightX, debugConfig.rimLightY, debugConfig.rimLightZ);
+
+      ambientLight.color.set(debugConfig.ambientLightColor);
+
+      ambientLight.intensity = debugConfig.ambientLightIntensity;
+
+      // Key light harshness affects material properties (how key light interacts with surfaces)
+
+      // Convert key light harshness (0-1) to roughness adjustment (very subtle range for more diffuse reflections)
+      // Base roughness values (more diffuse to start)
+      const baseRoughnessHidden = 0.95;
+      const baseRoughnessRevealed = 0.7; // Increased from 0.55 for more diffuse
+      const baseMetalness = 0.05;
+
+      // Further reduced harshness impact - only 0.05 range instead of 0.2
+      const roughnessAdjustment = debugConfig.keyLightHarshness * 0.05;
+
+      const targetRoughness = baseRoughnessHidden - roughnessAdjustment;
+
+      // Update materials with new roughness for softer/harsher key light response
+
+      matHidden.roughness = targetRoughness;
+
+      matRevealed.roughness = Math.max(0.5, baseRoughnessRevealed - roughnessAdjustment); // More diffuse, min 0.5
+
+      matFlag.roughness = targetRoughness;
+
+      // Update all flag materials with new roughness/metalness
+
+      state.tiles.forEach(t => {
+
+        if (t.flagMaterial){
+
+          t.flagMaterial.roughness = targetRoughness;
+
+          t.flagMaterial.metalness = specularFactor;
+
+        }
+
+      });
+
+      matMine.roughness = targetRoughness;
+
+      // Also adjust specular contribution based on key light harshness (very subtle)
+      // Reduced from 0.08 to 0.03 for more diffuse reflections
+      const specularFactor = baseMetalness + (debugConfig.keyLightHarshness * 0.03);
+
+      matHidden.metalness = specularFactor;
+
+      matRevealed.metalness = specularFactor + 0.1; // Reduced from 0.2 to 0.1
+
+      matFlag.metalness = specularFactor;
+
+      matMine.metalness = specularFactor;
+
+      // Rim light harshness affects rim light intensity (how much rim light contributes)
+      // Harshness 0 = 80% intensity (softer), Harshness 1 = 100% intensity (reduced range)
+      rimLight.intensity = debugConfig.rimLightIntensity * (0.8 + debugConfig.rimLightHarshness * 0.2);
+      
+      // Slightly boost rim light for better silhouette contrast
+      rimLight.intensity *= 1.2;
+
+    }
+
+    function rebuildCore(f){
+      resetTimer(); // Reset timer on new game
+      showLoading('Rebuilding geometry...');
+
+      setTimeout(() => {
+        f = Math.max(1, Math.floor(f)); state.f = f;
+
+        debugConfig.tileDensity = f;
+
+        const est = 10*f*f + 2; const tileEl = document.getElementById('tileCount'); if (tileEl) tileEl.textContent = `≈ 10·${f}² + 2 = ${est.toLocaleString()}`;
+
+        updateLoadingMessage('Generating sphere geometry...');
+
+        setTimeout(() => {
+          const base = icosahedron(1); const geo  = geodesicSubdivide(base, f, 1);
+
+          state.polys = buildDualPolygons(geo.verts, geo.faces); state.neighbors = buildAdjacency(state.polys);
+
+          updateLoadingMessage('Building tiles...');
+
+          setTimeout(() => {
+            buildTiles(); state.firstClick = true; state.gameOver=false; state.won = false; state.safeRevealed=0; state.totalMines=0; state.flags=0; state.lives=3; lifeLostInCurrentReveal = false; hideGameOver(); updateCounters(); updateLives(); spherePivot.position.set(0, 0, 0); targetPosition.set(0, 0, 0); spherePosition.set(0, 0, 0); sphereQuaternion.set(0, 0, 0, 1); targetQuaternion.set(0, 0, 0, 1);
+            
+            // Place mines and reveal initial tiles automatically
+            placeMines(-1, debugConfig.mineRatio); state.firstClick = false;
+          }, 10);
+        }, 10);
+      }, 10);
+    }
+
+
+
+    // Picking
+
+    const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+
+    function pickTile(event){
+
+      const rect = renderer.domElement.getBoundingClientRect();
+
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera); const hits = raycaster.intersectObjects(tileGroup.children, false);
+
+      if (hits.length===0) return -1; const mesh = hits[0].object; const idx = state.tiles.findIndex(t=>t.mesh===mesh); return idx;
+
+    }
+
+    // Mouse event tracking variables - must be declared before event listeners
+    let mouseDownPos = null;
+    let mouseDownButton = null;
+    let wasDragging = false;
+    let rightClickPanned = false; // Track if right-click resulted in panning
+    let contextMenuHandled = false; // Track if contextmenu event was handled to prevent secondary clicks
+    let rightMouseDownTime = 0; // Track when right mouse was pressed
+    let rightMouseDownPos = null; // Track where right mouse was pressed
+    let rightClickHandled = false; // Track if right-click was handled (flagging occurred) - blocks ALL reveals
+
+    renderer.domElement.addEventListener('contextmenu', (e)=>{
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      // Right-click flagging when not dragging or panning
+      // Don't flag if right-click drag (panning) occurred
+      
+      // Check if this was a click (not a drag/pan)
+      if (rightMouseDownPos) {
+        const dx = e.clientX - rightMouseDownPos.x;
+        const dy = e.clientY - rightMouseDownPos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // If mouse moved significantly, it was a pan, not a click
+        if (dist >= 10 || rightClickPanned) {
+          rightClickPanned = false;
+          rightMouseDownPos = null;
+          rightMouseDownTime = 0; // Clear immediately for panning
+          return;
+        }
+      }
+
+      // If we get here, it's a click (not a pan), so flag the tile
+      if (!rightClickPanned) {
+        const idx = pickTile(e);
+
+        if (idx >= 0){
+          toggleFlag(idx);
+          
+          // Mark that right-click flagging occurred - block only immediate subsequent events
+          contextMenuHandled = true;
+          rightClickHandled = true;
+          
+          // Clear flags after a short delay (only block immediate follow-up events)
+          // Use a shorter timeout - we only need to block events that are queued immediately
+          setTimeout(() => {
+            contextMenuHandled = false;
+            rightClickHandled = false;
+            rightMouseDownPos = null;
+            rightMouseDownTime = 0;
+          }, 300); // Short timeout - only block immediate follow-up events
+
+          rightClickPanned = false;
+          return;
+        }
+      }
+
+      rightClickPanned = false;
+      rightMouseDownPos = null;
+      rightMouseDownTime = 0;
+
+    });
+
+    const dragThreshold = 3;
+
+    renderer.domElement.addEventListener('mousedown', (e)=>{
+
+      if (e.button === 0) { // Left mouse button for rotation
+
+        // Clear right-click tracking when a new left-click starts
+        // This ensures left-clicks aren't blocked by stale right-click state
+        rightMouseDownTime = 0;
+        rightMouseDownPos = null;
+        contextMenuHandled = false;
+        rightClickHandled = false;
+
+        mouseDownPos = { x: e.clientX, y: e.clientY };
+
+        mouseDownButton = e.button;
+
+        wasDragging = false;
+
+        isRotating = false;
+
+        isPanning = false;
+
+        lastMousePos = { x: e.clientX, y: e.clientY };
+
+      } else if (e.button === 2) { // Right mouse button for panning
+
+        mouseDownPos = { x: e.clientX, y: e.clientY };
+        rightMouseDownPos = { x: e.clientX, y: e.clientY };
+        rightMouseDownTime = Date.now();
+
+        mouseDownButton = e.button;
+
+        wasDragging = false;
+
+        isRotating = false;
+
+        isPanning = false;
+
+        rightClickPanned = false;
+        contextMenuHandled = false; // Reset flag
+        rightClickHandled = false; // Reset flag
+
+        lastMousePos = { x: e.clientX, y: e.clientY };
+
+      }
+
+    });
+
+    renderer.domElement.addEventListener('mousemove', (e)=>{
+
+      if (mouseDownPos === null) return;
+
+      const dx = e.clientX - mouseDownPos.x;
+
+      const dy = e.clientY - mouseDownPos.y;
+
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      if (dist > dragThreshold) {
+
+        wasDragging = true;
+
+        const deltaX = e.clientX - lastMousePos.x;
+
+        const deltaY = e.clientY - lastMousePos.y;
+
+        if (mouseDownButton === 0) { // Left button for rotation
+
+          isRotating = true;
+
+          // Apply rotations in screen space (world space relative to camera)
+          // This ensures swiping left always rotates left from current view, regardless of sphere orientation
+          const cameraForward = new THREE.Vector3();
+          camera.getWorldDirection(cameraForward);
+          const cameraRight = new THREE.Vector3().crossVectors(cameraForward, camera.up).normalize();
+          const cameraUp = camera.up.clone();
+          
+          // Rotate around camera's up axis (world Y) for horizontal movement
+          const rotY = new THREE.Quaternion().setFromAxisAngle(cameraUp, deltaX * rotationSpeed);
+          // Rotate around camera's right axis for vertical movement
+          const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, deltaY * rotationSpeed);
+          
+          // Apply rotations in world space by multiplying quaternions
+          targetQuaternion.premultiply(rotY).premultiply(rotX);
+
+          lastMousePos = { x: e.clientX, y: e.clientY };
+
+        } else if (mouseDownButton === 2) { // Right button for panning
+
+          isPanning = true;
+
+          rightClickPanned = true; // Mark that panning occurred
+
+          // Pan by translating the sphere pivot in camera space
+
+          const cameraForward = new THREE.Vector3();
+
+          camera.getWorldDirection(cameraForward);
+
+          const cameraRight = new THREE.Vector3().crossVectors(cameraForward, camera.up).normalize();
+
+          const panVector = new THREE.Vector3();
+
+          // Fixed direction: right drag = move right, down drag = move down
+          panVector.addScaledVector(cameraRight, deltaX * panSpeed);
+
+          panVector.addScaledVector(camera.up.clone(), -deltaY * panSpeed);
+
+          targetPosition.add(panVector);
+
+          lastMousePos = { x: e.clientX, y: e.clientY };
+
+        }
+
+      }
+
+    });
+
+    renderer.domElement.addEventListener('mouseup', (e)=>{
+
+      if (mouseDownPos === null) return;
+
+      // For ALL right-click mouseup events, NEVER process anything - just clean up and return
+      // This prevents any accidental reveals after right-click flagging
+      if (e.button === 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        mouseDownPos = null;
+        mouseDownButton = null;
+        wasDragging = false;
+        // Note: rightMouseDownTime and rightMouseDownPos are managed by contextmenu handler
+        return;
+      }
+
+      if (wasDragging && (isRotating || isPanning)) {
+
+        isRotating = false;
+
+        isPanning = false;
+
+        mouseDownPos = null;
+
+        mouseDownButton = null;
+
+        wasDragging = false;
+
+        return;
+
+      }
+
+      if (wasDragging) {
+
+        mouseDownPos = null;
+
+        mouseDownButton = null;
+
+        wasDragging = false;
+
+        return;
+
+      }
+
+      // CRITICAL: Block reveals ONLY if:
+      // 1. This is a right-click mouseup (button === 2) - already handled above
+      // 2. Right mouse button was pressed (mouseDownButton === 2) - this is a right-click
+      // 3. Right-click flagging JUST occurred (within 300ms) AND we're not processing a left-click
+      // Note: Only block if mouseDownButton is 2 (right-click) or if it's a genuine right-click follow-up
+      if (e.button === 2 || mouseDownButton === 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        mouseDownPos = null;
+        mouseDownButton = null;
+        wasDragging = false;
+        return;
+      }
+      
+      // For left-clicks, only block if right-click flags are still active AND time is very recent
+      // But only if this isn't clearly a left-click (mouseDownButton === 0)
+      if (mouseDownButton === 0) {
+        // This is a left-click - don't block based on right-click state
+        // The mousedown handler should have already cleared right-click flags
+      } else if ((rightClickHandled || contextMenuHandled) && rightMouseDownTime > 0 && Date.now() - rightMouseDownTime < 300) {
+        // Block only if right-click happened very recently and we're not sure this is a left-click
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        mouseDownPos = null;
+        mouseDownButton = null;
+        wasDragging = false;
+        return;
+      }
+
+      const idx = pickTile(e);
+
+      if (idx >= 0) {
+
+        // Only handle left-click reveals - check if right-click just happened (within 500ms)
+        const timeSinceRightClick = rightMouseDownTime > 0 ? Date.now() - rightMouseDownTime : Infinity;
+        if (mouseDownButton === 0 && 
+            timeSinceRightClick > 500) {
+
+          if (state.firstClick){ placeMines(idx, debugConfig.mineRatio); state.firstClick = false; }
+
+          reveal(idx);
+
+        }
+
+      }
+
+      mouseDownPos = null;
+
+      mouseDownButton = null;
+
+      wasDragging = false;
+
+    });
+
+    renderer.domElement.addEventListener('click', (e)=>{
+
+      // CRITICAL: Block clicks ONLY if:
+      // 1. This is a right-click (button === 2)
+      // 2. Right-click flagging JUST occurred (within 300ms) - but only block if it's not clearly a left-click
+      // Note: Left-clicks should not be blocked after a right-click, as mousedown already cleared the flags
+      if (e.button === 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return;
+      }
+      
+      // For left-clicks, only block if right-click happened very recently (within 200ms)
+      // This is a tighter window to catch only immediate follow-up events
+      if (e.button === 0) {
+        const timeSinceRightClick = rightMouseDownTime > 0 ? Date.now() - rightMouseDownTime : Infinity;
+        if ((rightClickHandled || contextMenuHandled) && timeSinceRightClick < 200) {
+          // Very recent right-click - might be accidental, block it
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          return;
+        }
+      }
+      
+      if (wasDragging || e.button !== 0) return;
+
+      const idx = pickTile(e); if (idx<0) return;
+
+      if (e.detail === 2){ chord(idx); return; }
+
+    });
+
+    renderer.domElement.addEventListener('mouseleave', (e)=>{
+
+      mouseDownPos = null;
+
+      mouseDownButton = null;
+
+      wasDragging = false;
+
+      isRotating = false;
+
+      isPanning = false;
+
+      rightClickPanned = false;
+      // Don't reset rightClickHandled on mouseleave - let the timeout handle it
+      rightMouseDownTime = 0;
+      rightMouseDownPos = null;
+
+    });
+
+    renderer.domElement.addEventListener('wheel', (e)=>{
+
+      e.preventDefault();
+
+      const fovChange = e.deltaY * 0.005; // Sensitivity: 0.005 degrees per wheel step (wheel up = zoom out = higher FOV)
+
+      const newFOV = Math.max(10, Math.min(120, debugConfig.cameraFOV + fovChange));
+
+      debugConfig.cameraFOV = newFOV;
+
+      updateCamera();
+
+      // Update GUI if it exists
+
+      if (gui) {
+
+        const fovController = gui.__controllers.find(c => c.property === 'cameraFOV');
+
+        if (fovController) fovController.updateDisplay();
+
+      }
+
+    }, { passive: false });
+
+    // Touch events for mobile
+    let touchStartPos = null;
+    let touchStartDistance = 0;
+    let touchMode = null; // 'rotate', 'pan'
+    let lastTouchPos = null;
+    let touchStartTime = 0;
+    let touchMoved = false; // Track if touch moved during gesture
+    let lastTapTime = 0;
+    let lastTapPos = null;
+    let doubleTapTimer = null;
+    let touchFlagHandled = false; // Track if touch flagging occurred - blocks subsequent reveals
+    let touchFlagTime = 0; // Track when touch flagging occurred
+    const DOUBLE_TAP_DELAY = 150; // ms between taps (reduced for better responsiveness)
+    const DOUBLE_TAP_DISTANCE = 50; // pixels max distance
+    const TAP_MAX_DURATION = 200; // ms - taps longer than this are considered holds (reveal)
+    const TAP_MAX_MOVEMENT = 5; // pixels - movement beyond this is considered a drag (rotation)
+    let pendingReveal = null; // Track pending reveal (not used with new behavior but kept for compatibility)
+
+    renderer.domElement.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      
+      // Clear any stale touch flagging state when a new touch starts
+      // This prevents blocking legitimate reveals after the timeout period
+      if (touchFlagHandled && Date.now() - touchFlagTime > 300) {
+        touchFlagHandled = false;
+        touchFlagTime = 0;
+      }
+      
+      if (e.touches.length === 1) {
+        // Single touch - prepare for rotation or tap
+        touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        touchStartTime = Date.now();
+        touchMoved = false; // Reset movement tracking
+        touchMode = 'rotate';
+        isRotating = false;
+        wasDragging = false;
+      } else if (e.touches.length === 2) {
+        // Two finger touch - pan
+        touchMode = 'pan';
+        isPanning = false;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        touchStartDistance = Math.sqrt(dx * dx + dy * dy);
+      }
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      
+      if (e.touches.length === 1 && touchMode === 'rotate') {
+        if (touchStartPos === null) return;
+        
+        const dx = e.touches[0].clientX - touchStartPos.x;
+        const dy = e.touches[0].clientY - touchStartPos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Track if touch moved - any movement means it's not a simple tap (will flag instead)
+        if (dist > TAP_MAX_MOVEMENT) {
+          touchMoved = true; // Mark that touch moved - this will trigger flag on release
+          if (doubleTapTimer) {
+            clearTimeout(doubleTapTimer);
+            doubleTapTimer = null;
+            lastTapTime = 0;
+            lastTapPos = null;
+          }
+          wasDragging = true;
+          isRotating = true;
+          
+          const deltaX = e.touches[0].clientX - lastTouchPos.x;
+          const deltaY = e.touches[0].clientY - lastTouchPos.y;
+          
+          // Apply rotations in screen space for touch
+          const cameraForward = new THREE.Vector3();
+          camera.getWorldDirection(cameraForward);
+          const cameraRight = new THREE.Vector3().crossVectors(cameraForward, camera.up).normalize();
+          const cameraUp = camera.up.clone();
+          
+          const rotY = new THREE.Quaternion().setFromAxisAngle(cameraUp, deltaX * rotationSpeed * 1.5);
+          const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, deltaY * rotationSpeed * 1.5);
+          
+          targetQuaternion.premultiply(rotY).premultiply(rotX);
+          
+          lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+      } else if (e.touches.length === 2 && touchMode === 'pan') {
+        // Two finger pan - cancel any pending timers
+        if (doubleTapTimer) {
+          clearTimeout(doubleTapTimer);
+          doubleTapTimer = null;
+          lastTapTime = 0;
+          lastTapPos = null;
+        }
+        isPanning = true;
+        wasDragging = true;
+        
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const currentDistance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Pan based on movement
+        const touch1DeltaX = e.touches[0].clientX - lastTouchPos.x;
+        const touch1DeltaY = e.touches[0].clientY - lastTouchPos.y;
+        
+        const cameraForward = new THREE.Vector3();
+        camera.getWorldDirection(cameraForward);
+        const cameraRight = new THREE.Vector3().crossVectors(cameraForward, camera.up).normalize();
+        
+        const panVector = new THREE.Vector3();
+        panVector.addScaledVector(cameraRight, touch1DeltaX * panSpeed * 0.5);
+        panVector.addScaledVector(camera.up.clone(), -touch1DeltaY * panSpeed * 0.5);
+        targetPosition.add(panVector);
+        
+        lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      
+      if (e.touches.length === 0) {
+        // All touches ended
+        if (touchMode === 'rotate' && touchStartPos) {
+          const touchDuration = Date.now() - touchStartTime;
+          const currentTime = Date.now();
+          const timeSinceLastTap = currentTime - lastTapTime;
+          const tapDistance = lastTapPos ? 
+            Math.sqrt(Math.pow(touchStartPos.x - lastTapPos.x, 2) + Math.pow(touchStartPos.y - lastTapPos.y, 2)) : 
+            Infinity;
+          
+          // Check for double tap
+          // Since single tap now flags, double tap on same tile would toggle twice (no change)
+          // So we can just ignore double taps - the first tap already handled flagging
+          if (timeSinceLastTap < DOUBLE_TAP_DELAY && tapDistance < DOUBLE_TAP_DISTANCE && lastTapPos && !touchMoved && !wasDragging) {
+            // Double tap - just clear timers and ignore (first tap already flagged)
+            clearTimeout(doubleTapTimer);
+            doubleTapTimer = null;
+            lastTapTime = 0;
+            lastTapPos = null;
+            pendingReveal = null;
+            // Vibrate if supported for feedback
+            if (navigator.vibrate) navigator.vibrate(20);
+          } else {
+            // SWAPPED: Simple tap (flags) vs hold (reveals)
+            // If touch moved, it was a rotation/drag - do nothing
+            // If held too long (long duration) and no movement = reveal
+            // Simple tap (short duration, no movement) = flag
+            if (!wasDragging && !touchMoved) {
+              if (touchDuration > TAP_MAX_DURATION) {
+                // Long hold (no movement) = reveal
+                const fakeEvent = { clientX: touchStartPos.x, clientY: touchStartPos.y };
+                const idx = pickTile(fakeEvent);
+                
+                // CRITICAL: Block reveal if touch flagging just occurred
+                if (!touchFlagHandled && idx >= 0 && !state.gameOver) {
+                  // Clear any pending flag timers
+                  if (doubleTapTimer) {
+                    clearTimeout(doubleTapTimer);
+                    doubleTapTimer = null;
+                  }
+                  
+                  // Reveal on hold
+                  if (state.firstClick) {
+                    placeMines(idx, debugConfig.mineRatio);
+                    state.firstClick = false;
+                  }
+                  reveal(idx);
+                  
+                  // Vibrate if supported
+                  if (navigator.vibrate) navigator.vibrate(30);
+                }
+              } else {
+                // Simple tap with no movement and short duration = flag
+                lastTapPos = { x: touchStartPos.x, y: touchStartPos.y };
+                lastTapTime = currentTime;
+                
+                const fakeEvent = { clientX: touchStartPos.x, clientY: touchStartPos.y };
+                const idx = pickTile(fakeEvent);
+                
+                if (idx >= 0 && !state.gameOver) {
+                  toggleFlag(idx);
+                  // Vibrate if supported
+                  if (navigator.vibrate) navigator.vibrate(50);
+                  
+                  // Mark that touch flagging occurred - block subsequent reveals
+                  touchFlagHandled = true;
+                  touchFlagTime = Date.now();
+                  
+                  // Clear flag after a short delay (only block immediate follow-up events)
+                  setTimeout(() => {
+                    touchFlagHandled = false;
+                    touchFlagTime = 0;
+                  }, 300); // Short timeout - only block immediate follow-up events
+                  
+                  // Set up timer for potential double-tap (double tap still flags)
+                  doubleTapTimer = setTimeout(() => {
+                    lastTapTime = 0;
+                    lastTapPos = null;
+                    doubleTapTimer = null;
+                  }, DOUBLE_TAP_DELAY);
+                }
+              }
+            }
+          }
+        }
+        
+        touchStartPos = null;
+        touchStartDistance = 0;
+        touchMode = null;
+        isRotating = false;
+        isPanning = false;
+        wasDragging = false;
+      }
+    }, { passive: false });
+
+
+
+    // Self-tests
+
+    function runTests(){
+
+      const statusEl = document.getElementById('testStatus'); const results = [];
+
+      function assert(name, cond){ results.push({name, pass: !!cond}); if(!cond) console.error('Test failed:', name); }
+
+      for (let f=1; f<=6; f++){
+
+        const base = icosahedron(1); const geo  = geodesicSubdivide(base, f, 1); const polys = buildDualPolygons(geo.verts, geo.faces); const neigh = buildAdjacency(polys);
+
+        const counts = polys.reduce((acc,p)=>{ acc.total++; acc['n'+p.length]=(acc['n'+p.length]||0)+1; return acc; }, {total:0});
+
+        assert(`f=${f}: pentagons==12`, counts.n5 === 12);
+
+        assert(`f=${f}: only hex/pent`, (counts.n5||0) + (counts.n6||0) === polys.length);
+
+        assert(`f=${f}: tiles==10 f^2 + 2`, polys.length === 10*f*f + 2);
+
+        const degOK = neigh.every((ns, i)=> (polys[i].length===5 ? ns.length===5 : (ns.length===6)) ); assert(`f=${f}: degrees 5/6`, degOK);
+
+      }
+
+      const failed = results.filter(r=>!r.pass).length; if (statusEl) { statusEl.textContent = failed===0 ? `All ${results.length} tests passed` : `${failed}/${results.length} tests failed`; statusEl.className = 'pill ' + (failed===0 ? 'ok' : 'bad'); }
+
+    }
+
+
+
+    // UI
+    
+    // Preset cycling variables - must be in global scope
+    let presetNames = [];
+    let currentPresetIndex = 0;
+    let palettes = null; // Will be set in initGUI
+    
+    // Scoreboard auto-collapse after 5 seconds
+    let scoreboardCollapseTimer = null;
+    const scoreboard = document.getElementById('scoreboard');
+    
+    function resetScoreboardTimer() {
+      scoreboard.classList.remove('collapsed');
+      if (scoreboardCollapseTimer) {
+        clearTimeout(scoreboardCollapseTimer);
+      }
+      scoreboardCollapseTimer = setTimeout(() => {
+        scoreboard.classList.add('collapsed');
+      }, 5000);
+    }
+    
+    // Expand scoreboard on click/touch
+    scoreboard.addEventListener('click', (e) => {
+      // Don't expand if clicking buttons
+      if (e.target.closest('.btn-reset, .btn-sound, .btn-settings, .btn-palette')) {
+        return;
+      }
+      resetScoreboardTimer();
+    });
+    
+    scoreboard.addEventListener('touchstart', (e) => {
+      // Don't expand if touching buttons
+      if (e.target.closest('.btn-reset, .btn-sound, .btn-settings, .btn-palette')) {
+        return;
+      }
+      resetScoreboardTimer();
+    }, { passive: true });
+    
+    // Start the timer
+    resetScoreboardTimer();
+    
+    // Scoreboard button handlers
+    document.getElementById('scoreboardReset').addEventListener('click', ()=>{ rebuildCore(state.f); resetScoreboardTimer(); });
+    document.getElementById('gameOverRestart').addEventListener('click', ()=>{ rebuildCore(state.f); });
+    document.getElementById('scoreboardSound').addEventListener('click', ()=>{
+      resetScoreboardTimer();
+      debugConfig.soundEnabled = !debugConfig.soundEnabled;
+      // Update button icon
+      const soundBtn = document.getElementById('scoreboardSound');
+      const soundOnSvg = soundBtn.querySelector('.sound-on');
+      const soundOffSvg = soundBtn.querySelector('.sound-off');
+      if (debugConfig.soundEnabled) {
+        soundOnSvg.style.display = 'block';
+        soundOffSvg.style.display = 'none';
+      } else {
+        soundOnSvg.style.display = 'none';
+        soundOffSvg.style.display = 'block';
+      }
+      // Update GUI if initialized
+      if (gui) {
+        const soundController = gui.__controllers.find(c => c.property === 'soundEnabled');
+        if (soundController) soundController.setValue(debugConfig.soundEnabled);
+      }
+    });
+    document.getElementById('scoreboardSettings').addEventListener('click', ()=>{
+      toggleGUI();
+      resetScoreboardTimer();
+    });
+    
+    // Palette modal functionality
+    const paletteOverlay = document.getElementById('paletteOverlay');
+    const paletteGrid = document.getElementById('paletteGrid');
+    let paletteController = null; // Will be set in initGUI
+    const thumbnailCache = new Map(); // Cache for generated thumbnails
+    let thumbnailRenderer = null; // Reusable renderer for thumbnails
+    
+    function showPaletteModal() {
+      populatePaletteGrid(); // Refresh grid to ensure active state is correct
+      paletteOverlay.classList.add('visible');
+      resetScoreboardTimer();
+    }
+    
+    function hidePaletteModal() {
+      paletteOverlay.classList.remove('visible');
+    }
+    
+    // Function to generate a gameplay thumbnail for a preset (cached)
+    function generatePaletteThumbnail(presetName, preset) {
+      // Check cache first
+      if (thumbnailCache.has(presetName)) {
+        const cached = thumbnailCache.get(presetName);
+        // Clone the canvas to avoid sharing the same canvas element
+        const clonedCanvas = document.createElement('canvas');
+        clonedCanvas.width = cached.width;
+        clonedCanvas.height = cached.height;
+        const ctx = clonedCanvas.getContext('2d');
+        ctx.drawImage(cached, 0, 0);
+        return clonedCanvas;
+      }
+      
+      // Create a small offscreen canvas for rendering
+      const thumbnailCanvas = document.createElement('canvas');
+      thumbnailCanvas.width = 120;
+      thumbnailCanvas.height = 60;
+      
+      // Reuse or create a single renderer for all thumbnails
+      if (!thumbnailRenderer) {
+        const rendererCanvas = document.createElement('canvas');
+        rendererCanvas.width = 120;
+        rendererCanvas.height = 60;
+        thumbnailRenderer = new THREE.WebGLRenderer({ 
+          canvas: rendererCanvas, 
+          antialias: false,
+          alpha: true,
+          preserveDrawingBuffer: true
+        });
+        thumbnailRenderer.setSize(120, 60);
+        thumbnailRenderer.setPixelRatio(1);
+      }
+      
+      // Temporarily set the renderer to use our canvas
+      const originalCanvas = thumbnailRenderer.domElement;
+      
+      // Create a small camera
+      const thumbnailCamera = new THREE.PerspectiveCamera(50, 2, 0.1, 100);
+      thumbnailCamera.position.set(0, 0, 2.5);
+      
+      // Create a minimal scene
+      const thumbnailScene = new THREE.Scene();
+      if (preset.backgroundColor) {
+        thumbnailScene.background = new THREE.Color(preset.backgroundColor);
+      } else {
+        thumbnailScene.background = new THREE.Color(0x121911);
+      }
+      
+      // Create a simple sphere with a few tiles to show the palette
+      const base = icosahedron(1);
+      const geo = geodesicSubdivide(base, 3, 1); // Use f=3 for a reasonable number of tiles
+      const polys = buildDualPolygons(geo.verts, geo.faces);
+      
+      // Create materials with the preset colors
+      const thumbMatHidden = new THREE.MeshStandardMaterial({ 
+        color: preset.hiddenColor || '#3a4a5a', 
+        roughness: 0.95, 
+        metalness: 0.05,
+        side: THREE.FrontSide,
+        emissive: new THREE.Color(0x222222),
+        emissiveIntensity: 0.15
+      });
+      const thumbMatRevealed = new THREE.MeshStandardMaterial({ 
+        color: preset.revealedColor || '#4a5a6a', 
+        roughness: 0.7, 
+        metalness: 0.08,
+        side: THREE.FrontSide,
+        emissive: new THREE.Color(0x333333),
+        emissiveIntensity: 0.2
+      });
+      const thumbMatFlag = new THREE.MeshStandardMaterial({ 
+        color: preset.flagColor || '#ffaa00', 
+        roughness: 0.6, 
+        metalness: 0.05,
+        side: THREE.FrontSide
+      });
+      
+      // Create a group for tiles
+      const thumbnailGroup = new THREE.Group();
+      
+      // Use a deterministic seed for consistent thumbnails (use preset name hash)
+      let seed = 0;
+      for (let i = 0; i < presetName.length; i++) {
+        seed = ((seed << 5) - seed) + presetName.charCodeAt(i);
+        seed = seed & seed; // Convert to 32bit integer
+      }
+      const seededRandom = (() => {
+        let value = Math.abs(seed);
+        return () => {
+          value = (value * 9301 + 49297) % 233280;
+          return value / 233280;
+        };
+      })();
+      
+      // Create a subset of tiles (about 30% hidden, 50% revealed, 20% flagged) to show variety
+      polys.forEach((poly, i) => {
+        const rand = seededRandom();
+        let material = thumbMatHidden;
+        if (rand < 0.5) {
+          material = thumbMatRevealed;
+        } else if (rand < 0.7) {
+          material = thumbMatFlag;
+        }
+        
+        const mesh = polygonToMesh(poly, material);
+        thumbnailGroup.add(mesh);
+      });
+      
+      // Add simple lighting
+      const thumbKeyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      thumbKeyLight.position.set(5, 3, 2);
+      thumbnailScene.add(thumbKeyLight);
+      
+      const thumbAmbient = new THREE.AmbientLight(0xffffff, 0.8);
+      thumbnailScene.add(thumbAmbient);
+      
+      // Add the sphere to the scene
+      thumbnailScene.add(thumbnailGroup);
+      
+      // Rotate slightly for better view
+      thumbnailGroup.rotation.y = 0.3;
+      thumbnailGroup.rotation.x = 0.2;
+      
+      // Render to renderer's canvas
+      thumbnailRenderer.render(thumbnailScene, thumbnailCamera);
+      
+      // Copy from renderer canvas to our canvas
+      const ctx = thumbnailCanvas.getContext('2d');
+      ctx.drawImage(thumbnailRenderer.domElement, 0, 0);
+      
+      // Clean up scene resources
+      thumbnailGroup.children.forEach(child => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+      thumbnailScene.clear();
+      
+      // Dispose materials
+      thumbMatHidden.dispose();
+      thumbMatRevealed.dispose();
+      thumbMatFlag.dispose();
+      
+      // Cache the result
+      thumbnailCache.set(presetName, thumbnailCanvas);
+      
+      // Return a clone to avoid sharing the cached canvas
+      const clonedCanvas = document.createElement('canvas');
+      clonedCanvas.width = thumbnailCanvas.width;
+      clonedCanvas.height = thumbnailCanvas.height;
+      const cloneCtx = clonedCanvas.getContext('2d');
+      cloneCtx.drawImage(thumbnailCanvas, 0, 0);
+      return clonedCanvas;
+    }
+    
+    function populatePaletteGrid() {
+      if (!palettes || !paletteGrid) return; // Guard against undefined
+      paletteGrid.innerHTML = '';
+      presetNames.forEach((presetName, index) => {
+        const preset = palettes[presetName];
+        const item = document.createElement('div');
+        item.className = 'palette-item';
+        if (index === currentPresetIndex) {
+          item.classList.add('active');
+        }
+        
+        // Create thumbnail with real gameplay preview
+        const thumbnail = document.createElement('div');
+        thumbnail.className = 'palette-thumbnail';
+        
+        // Generate thumbnail canvas
+        const thumbnailCanvas = generatePaletteThumbnail(presetName, preset);
+        thumbnail.appendChild(thumbnailCanvas);
+        
+        // Add click handler to thumbnail
+        thumbnail.addEventListener('click', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          currentPresetIndex = index;
+          // Use window.applyPalette if available, otherwise try local
+          if (window.applyPalette) {
+            window.applyPalette(preset);
+          }
+          if (paletteController) {
+            paletteController.setValue(presetName);
+          }
+          if (window.updatePresetDisplay) {
+            window.updatePresetDisplay();
+          }
+          updatePaletteGridActive();
+          // Small delay to show selection before closing
+          setTimeout(() => {
+            hidePaletteModal();
+          }, 150);
+        });
+        
+        // Only show name below thumbnail (not in thumbnail)
+        const name = document.createElement('div');
+        name.className = 'palette-name';
+        name.textContent = presetName;
+        
+        item.appendChild(thumbnail);
+        item.appendChild(name);
+        
+        // Also make the whole item clickable as fallback
+        item.addEventListener('click', (e) => {
+          // Don't trigger if thumbnail was clicked (already handled)
+          if (e.target === thumbnail || thumbnail.contains(e.target)) {
+            return;
+          }
+          currentPresetIndex = index;
+          // Use window.applyPalette if available, otherwise try local
+          if (window.applyPalette) {
+            window.applyPalette(preset);
+          }
+          if (paletteController) {
+            paletteController.setValue(presetName);
+          }
+          if (window.updatePresetDisplay) {
+            window.updatePresetDisplay();
+          }
+          updatePaletteGridActive();
+          // Small delay to show selection before closing
+          setTimeout(() => {
+            hidePaletteModal();
+          }, 150);
+        });
+        
+        paletteGrid.appendChild(item);
+      });
+    }
+    
+    function updatePaletteGridActive() {
+      const items = paletteGrid.querySelectorAll('.palette-item');
+      items.forEach((item, index) => {
+        if (index === currentPresetIndex) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+    }
+    
+    document.getElementById('scoreboardPalette').addEventListener('click', (e) => {
+      e.stopPropagation();
+      showPaletteModal();
+    });
+    
+    // Close modal when clicking outside
+    paletteOverlay.addEventListener('click', (e) => {
+      if (e.target === paletteOverlay) {
+        hidePaletteModal();
+      }
+    });
+    
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && paletteOverlay.classList.contains('visible')) {
+        hidePaletteModal();
+      }
+    });
+
+    // ===== Debug GUI =====
+
+    let gui = null;
+
+    let guiVisible = false;
+
+    function initGUI(){
+
+      if (gui) return;
+
+      gui = new dat.GUI({ autoPlace: true, closed: false });
+
+      const f1 = gui.addFolder('Game Settings');
+
+      f1.add(debugConfig, 'tileDensity', 1, 20, 1).name('Tile Density').onChange((val)=>{ rebuildCore(Math.floor(val)); });
+
+      f1.add(debugConfig, 'mineRatio', 5, 30, 1).name('Mine %');
+
+      f1.add(debugConfig, 'emptyTileRatio', 0, 50, 1).name('Empty Tile %').onChange(()=>{ rebuildCore(state.f); });
+
+      f1.add(debugConfig, 'initialRevealPercent', 0, 50, 1).name('Initial Reveal %');
+
+      f1.add(debugConfig, 'emptyGlassOpacity', 0, 1, 0.01).name('Glass Transparency').onChange((val)=>{ matEmpty.opacity = Math.max(0.5, val); });
+
+      f1.addColor(debugConfig, 'emptyGlassTint').name('Glass Tint').onChange((val)=>{ matEmpty.color.set(val); matEmpty.emissive.set(val); });
+
+      f1.add(debugConfig, 'immortalMode').name('Immortal Mode');
+
+      const f2 = gui.addFolder('Wireframe Colors');
+
+      f2.addColor(debugConfig, 'wireHexColor').name('Hex Color').onChange(()=>{ if (state.polys.length) updateWireframe(); });
+
+      f2.addColor(debugConfig, 'wirePentColor').name('Pent Color').onChange(()=>{ if (state.polys.length) updateWireframe(); });
+
+      const f3 = gui.addFolder('Tile Colors');
+
+      f3.addColor(debugConfig, 'hiddenColor').name('Hidden').onChange(()=>{ updateMaterials(); });
+
+      f3.addColor(debugConfig, 'revealedColor').name('Revealed').onChange(()=>{ updateMaterials(); });
+
+      f3.addColor(debugConfig, 'flagColor').name('Flag').onChange(()=>{ updateMaterials(); });
+
+      f3.addColor(debugConfig, 'mineColor').name('Mine').onChange(()=>{ updateMaterials(); });
+
+      f3.addColor(debugConfig, 'mineEmissive').name('Mine Emissive').onChange(()=>{ updateMaterials(); });
+
+      const f4 = gui.addFolder('Number Labels');
+
+      f4.add(debugConfig, 'numberOffset', 0.98, 1.05, 0.001).name('Offset').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberRotation', -180, 180, 1).name('Rotation (deg)').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberRotationX', -180, 180, 1).name('Rotation X (deg)').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberRotationY', -180, 180, 1).name('Rotation Y (deg)').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberRotationZ', -180, 180, 1).name('Rotation Z (deg)').onChange(()=>{ updateLabels(); });
+
+      f4.add(debugConfig, 'numberScale', 0.5, 2.0, 0.1).name('Scale').onChange(()=>{ updateLabels(); });
+
+      f4.addColor(debugConfig, 'numberColor').name('Color').onChange(()=>{ updateLabels(); });
+
+      const f5 = gui.addFolder('Camera');
+
+      f5.addColor(debugConfig, 'backgroundColor').name('Background').onChange(()=>{ scene.background.set(debugConfig.backgroundColor); });
+
+      f5.add(debugConfig, 'cameraFOV', 10, 120, 1).name('FOV').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraX', -10, 10, 0.1).name('Position X').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraY', -10, 10, 0.1).name('Position Y').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraZ', 1, 10, 0.1).name('Position Z').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraNear', 0.001, 1, 0.001).name('Near').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'cameraFar', 10, 1000, 10).name('Far').onChange(()=>{ updateCamera(); });
+
+      f5.add(debugConfig, 'fogEnabled').name('Fog Enabled').onChange(()=>{ updateFog(); });
+
+      f5.add(debugConfig, 'fogNear', 0, 5, 0.1).name('Fog Near').onChange(()=>{ updateFog(); });
+
+      f5.add(debugConfig, 'fogFar', 0, 10, 0.1).name('Fog Far').onChange(()=>{ updateFog(); });
+
+      const f6 = gui.addFolder('Lighting');
+
+      const f6a = f6.addFolder('Key Light');
+
+      f6a.addColor(debugConfig, 'keyLightColor').name('Color').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightIntensity', 0, 10, 0.1).name('Intensity').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightX', -10, 10, 0.1).name('Position X').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightY', -10, 10, 0.1).name('Position Y').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightZ', -10, 10, 0.1).name('Position Z').onChange(()=>{ updateLights(); });
+
+      f6a.add(debugConfig, 'keyLightHarshness', 0, 1, 0.05).name('Harshness').onChange(()=>{ updateLights(); });
+
+      const f6b = f6.addFolder('Rim Light');
+
+      f6b.addColor(debugConfig, 'rimLightColor').name('Color').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightIntensity', 0, 10, 0.1).name('Intensity').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightX', -10, 10, 0.1).name('Position X').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightY', -10, 10, 0.1).name('Position Y').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightZ', -10, 10, 0.1).name('Position Z').onChange(()=>{ updateLights(); });
+
+      f6b.add(debugConfig, 'rimLightHarshness', 0, 1, 0.05).name('Harshness').onChange(()=>{ updateLights(); });
+
+      const f6c = f6.addFolder('Ambient Light');
+
+      f6c.addColor(debugConfig, 'ambientLightColor').name('Color').onChange(()=>{ updateLights(); });
+
+      f6c.add(debugConfig, 'ambientLightIntensity', 0, 10, 0.1).name('Intensity').onChange(()=>{ updateLights(); });
+
+      const f7 = gui.addFolder('Sound Effects');
+
+      f7.add(debugConfig, 'soundEnabled').name('Enabled');
+
+      f7.add(debugConfig, 'soundVolume', 0, 1, 0.01).name('Volume');
+
+      f7.add(debugConfig, 'revealSoundIndex', { 'Beep (Default)': 0, 'Click 1': 1, 'Click 2': 2, 'Click 3': 3, 'Click 4': 4, 'Click 5': 5 }).name('Reveal Sound');
+
+      f7.add(debugConfig, 'flagSoundIndex', { 'Beep (Default)': 0, 'Flag 1': 1, 'Flag 2': 2, 'Flag 3': 3, 'Flag 4': 4, 'Flag 5': 5 }).name('Flag Sound');
+
+      f7.add(debugConfig, 'gameOverSoundIndex', { 'Beep (Default)': 0, 'Valve 1': 1, 'Valve 2': 2, 'Valve 3': 3, 'Valve 4': 4, 'Valve 5': 5 }).name('Game Over Sound');
+
+      // Color palette presets
+      // Make applyPalette globally accessible
+      window.applyPalette = (preset) => {
+
+        Object.keys(preset).forEach(key => {
+
+          if (debugConfig.hasOwnProperty(key)) {
+
+            debugConfig[key] = preset[key];
+
+          }
+
+        });
+
+        // Update glass material
+        if (preset.emptyGlassOpacity !== undefined) {
+          matEmpty.opacity = Math.max(0.5, preset.emptyGlassOpacity);
+        }
+        if (preset.emptyGlassTint !== undefined) {
+          matEmpty.color.set(preset.emptyGlassTint);
+          matEmpty.emissive.set(preset.emptyGlassTint);
+        }
+
+        // Update all visuals
+
+        updateMaterials();
+
+        updateWireframe();
+
+        updateLabels();
+
+        // Update background color
+        if (preset.backgroundColor) {
+          scene.background.set(preset.backgroundColor);
+        }
+        
+        // Update all flagged tiles to use new flag color
+        state.tiles.forEach((t, i) => {
+          if (t.flagged) {
+            updateFlagMaterial(i);
+          }
+        });
+
+      };
+
+      // Function to update preset display next to FPS (make it global)
+      window.updatePresetDisplay = function() {
+        const fpsEl = document.getElementById('fps');
+        const presetEl = document.getElementById('fpsPreset');
+        if (presetEl && presetNames.length > 0) {
+          const presetName = presetNames[currentPresetIndex] || 'Shadow';
+          presetEl.textContent = presetName;
+        } else if (fpsEl && presetNames.length > 0) {
+          // Fallback if preset element doesn't exist yet
+          const presetName = presetNames[currentPresetIndex] || 'Shadow';
+          const currentText = fpsEl.textContent;
+          // Extract FPS value if present, otherwise use --
+          const fpsMatch = currentText.match(/FPS: (\d+)/);
+          if (fpsMatch) {
+            fpsEl.innerHTML = `FPS: ${fpsMatch[1]} | <span class="fps-preset" id="fpsPreset">${presetName}</span>`;
+          } else {
+            fpsEl.innerHTML = `FPS: -- | <span class="fps-preset" id="fpsPreset">${presetName}</span>`;
+          }
+          // Re-attach click handler after innerHTML update
+          attachPresetClickHandler();
+        }
+      };
+
+      // Function to cycle to next preset (make it global)
+      window.cyclePreset = function() {
+        if (presetNames.length === 0) return;
+        currentPresetIndex = (currentPresetIndex + 1) % presetNames.length;
+        const presetName = presetNames[currentPresetIndex];
+        if (window.applyPalette) {
+          window.applyPalette(palettes[presetName]);
+        }
+        if (paletteController) {
+          paletteController.setValue(presetName);
+        }
+        if (window.updatePresetDisplay) {
+          window.updatePresetDisplay();
+        }
+        // Update palette grid active state if modal is open
+        if (paletteOverlay && paletteOverlay.classList.contains('visible')) {
+          updatePaletteGridActive();
+        }
+      };
+
+      // Function to attach click/touch handlers to preset element using event delegation
+      // This way handlers persist even when the DOM is updated
+      function attachPresetClickHandler() {
+        const fpsEl = document.getElementById('fps');
+        if (!fpsEl || fpsEl.dataset.handlersAttached) return;
+        
+        fpsEl.dataset.handlersAttached = 'true';
+        
+        // Click handler (desktop) - use event delegation
+        fpsEl.addEventListener('click', (e) => {
+          const presetEl = e.target.closest('.fps-preset');
+          if (presetEl) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.cyclePreset) {
+              window.cyclePreset();
+            }
+          }
+        });
+
+        // Touch handler (mobile) - use event delegation
+        let touchStartTime = 0;
+        let touchMoved = false;
+        let touchTarget = null;
+        
+        fpsEl.addEventListener('touchstart', (e) => {
+          const presetEl = e.target.closest('.fps-preset');
+          if (presetEl) {
+            touchTarget = presetEl;
+            touchStartTime = Date.now();
+            touchMoved = false;
+          }
+        }, { passive: true });
+
+        fpsEl.addEventListener('touchmove', (e) => {
+          if (touchTarget) {
+            touchMoved = true;
+          }
+        }, { passive: true });
+
+        fpsEl.addEventListener('touchend', (e) => {
+          const presetEl = e.target.closest('.fps-preset');
+          if (presetEl && presetEl === touchTarget) {
+            e.preventDefault();
+            e.stopPropagation();
+            const touchDuration = Date.now() - touchStartTime;
+            // Only trigger if it was a tap (no movement, short duration)
+            if (!touchMoved && touchDuration < 300) {
+              if (window.cyclePreset) {
+                window.cyclePreset();
+              }
+            }
+            touchTarget = null;
+          }
+        });
+      }
+
+      palettes = {
+
+        'Aurora': {
+
+          wireHexColor: '#2a3a4a',
+
+          wirePentColor: '#243440',
+
+          hiddenColor: '#3a4a5a',
+
+          revealedColor: '#4a5a6a',
+
+          flagColor: '#ffaa00',
+
+          mineColor: '#5a6a7a',
+
+          mineEmissive: '#203040',
+
+          numberColor: '#88bbff',
+
+          emptyGlassOpacity: 0.25,
+
+          emptyGlassTint: '#66ffaa'
+
+        },
+
+        'Shadow': {
+
+          wireHexColor: '#1a1a1a',
+
+          wirePentColor: '#151515',
+
+          hiddenColor: '#2a2a2a',
+
+          revealedColor: '#3a3a3a',
+
+          flagColor: '#ffcc00',
+
+          mineColor: '#5a2a2a',
+
+          mineEmissive: '#602020',
+
+          numberColor: '#aaaaaa',
+
+          emptyGlassOpacity: 0.2,
+
+          emptyGlassTint: '#5c68b7'
+
+        },
+
+        'Blue': {
+
+          wireHexColor: '#4a5a6a',
+
+          wirePentColor: '#5a6a7a',
+
+          hiddenColor: '#5a6a7a',
+
+          revealedColor: '#4a5a8a',
+
+          flagColor: '#ff44aa',
+
+          mineColor: '#ff4444',
+
+          mineEmissive: '#404070',
+
+          numberColor: '#aaccff',
+
+          backgroundColor: '#242931',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#7a9aff'
+
+        },
+
+        'Crystal': {
+
+          wireHexColor: '#3a4a5a',
+
+          wirePentColor: '#344050',
+
+          hiddenColor: '#3a4a5a',
+
+          revealedColor: '#5a6a7a',
+
+          flagColor: '#ff00ff',
+
+          mineColor: '#ff4444',
+
+          mineEmissive: '#404070',
+
+          numberColor: '#ddeeff',
+
+          emptyGlassOpacity: 0.35,
+
+          emptyGlassTint: '#ff88ff'
+
+        },
+
+        'Arctic': {
+
+          wireHexColor: '#3a4a5a',
+
+          wirePentColor: '#344454',
+
+          hiddenColor: '#3a4a5a',
+
+          revealedColor: '#4a5a6a',
+
+          flagColor: '#00ffff',
+
+          mineColor: '#5a6a7a',
+
+          mineEmissive: '#283850',
+
+          numberColor: '#aaccff',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#ffdd66'
+
+        },
+
+        'Emerald': {
+
+          wireHexColor: '#3a5a3a',
+
+          wirePentColor: '#345034',
+
+          hiddenColor: '#4a6a4a',
+
+          revealedColor: '#5a7a5a',
+
+          flagColor: '#00ff88',
+
+          mineColor: '#5a4a4a',
+
+          mineEmissive: '#403030',
+
+          numberColor: '#88ffcc',
+
+          emptyGlassOpacity: 0.28,
+
+          emptyGlassTint: '#ff88ff'
+
+        },
+
+        'Violet': {
+
+          wireHexColor: '#3a2a4a',
+
+          wirePentColor: '#342440',
+
+          hiddenColor: '#4a3a5a',
+
+          revealedColor: '#5a4a6a',
+
+          flagColor: '#ff00aa',
+
+          mineColor: '#6a5a7a',
+
+          mineEmissive: '#504060',
+
+          numberColor: '#ccaaff',
+
+          emptyGlassOpacity: 0.32,
+
+          emptyGlassTint: '#66ffaa'
+
+        },
+
+        'Coral': {
+
+          wireHexColor: '#4a3a34',
+
+          wirePentColor: '#44342f',
+
+          hiddenColor: '#5a4a3a',
+
+          revealedColor: '#6a5a4a',
+
+          flagColor: '#ff6600',
+
+          mineColor: '#7a5a5a',
+
+          mineEmissive: '#604040',
+
+          numberColor: '#ffccaa',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#66ffff'
+
+        },
+
+        'Steel': {
+
+          wireHexColor: '#3a3a3a',
+
+          wirePentColor: '#343434',
+
+          hiddenColor: '#4a4a4a',
+
+          revealedColor: '#5a5a5a',
+
+          flagColor: '#ffaa00',
+
+          mineColor: '#6a6a6a',
+
+          mineEmissive: '#403030',
+
+          numberColor: '#dddddd',
+
+          emptyGlassOpacity: 0.25,
+
+          emptyGlassTint: '#ff88ff'
+
+        },
+
+        'Sage': {
+
+          wireHexColor: '#3a4a3a',
+
+          wirePentColor: '#344434',
+
+          hiddenColor: '#4a5a4a',
+
+          revealedColor: '#5a6a5a',
+
+          flagColor: '#00ff66',
+
+          mineColor: '#6a7a6a',
+
+          mineEmissive: '#405040',
+
+          numberColor: '#ccffdd',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#ff66aa'
+
+        },
+
+        'Amber': {
+
+          wireHexColor: '#4a3a2a',
+
+          wirePentColor: '#443427',
+
+          hiddenColor: '#5a4a3a',
+
+          revealedColor: '#6a5a4a',
+
+          flagColor: '#ff8800',
+
+          mineColor: '#7a6a4a',
+
+          mineEmissive: '#605030',
+
+          numberColor: '#ffdd88',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#66ffff'
+
+        },
+
+        'Mist': {
+
+          wireHexColor: '#3a3a4a',
+
+          wirePentColor: '#343444',
+
+          hiddenColor: '#4a4a5a',
+
+          revealedColor: '#5a5a6a',
+
+          flagColor: '#ff00cc',
+
+          mineColor: '#6a6a7a',
+
+          mineEmissive: '#404050',
+
+          numberColor: '#eeeeff',
+
+          emptyGlassOpacity: 0.35,
+
+          emptyGlassTint: '#ffcc66'
+
+        },
+
+        'Rust': {
+
+          wireHexColor: '#4a3a2a',
+
+          wirePentColor: '#443427',
+
+          hiddenColor: '#5a4a3a',
+
+          revealedColor: '#6a5a4a',
+
+          flagColor: '#ff4400',
+
+          mineColor: '#7a5a4a',
+
+          mineEmissive: '#604030',
+
+          numberColor: '#ffbb88',
+
+          emptyGlassOpacity: 0.28,
+
+          emptyGlassTint: '#66ffcc'
+
+        },
+
+        'Midnight': {
+
+          wireHexColor: '#2a2a3a',
+
+          wirePentColor: '#242434',
+
+          hiddenColor: '#3a3a4a',
+
+          revealedColor: '#4a4a5a',
+
+          flagColor: '#ff00ff',
+
+          mineColor: '#5a4a5a',
+
+          mineEmissive: '#404050',
+
+          numberColor: '#aa88ff',
+
+          emptyGlassOpacity: 0.2,
+
+          emptyGlassTint: '#ffee66'
+
+        },
+
+        'Dawn': {
+
+          wireHexColor: '#4a3834',
+
+          wirePentColor: '#44322f',
+
+          hiddenColor: '#5a4844',
+
+          revealedColor: '#6a5854',
+
+          flagColor: '#ff6600',
+
+          mineColor: '#7a6864',
+
+          mineEmissive: '#604040',
+
+          numberColor: '#ffccaa',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#66ddff'
+
+        },
+
+        'Neon': {
+
+          wireHexColor: '#3a3a4a',
+
+          wirePentColor: '#343444',
+
+          hiddenColor: '#4a4a5a',
+
+          revealedColor: '#5a5a6a',
+
+          flagColor: '#ff00ff',
+
+          mineColor: '#5a4a6a',
+
+          mineEmissive: '#304050',
+
+          numberColor: '#66ffff',
+
+          emptyGlassOpacity: 0.35,
+
+          emptyGlassTint: '#ff88ff'
+
+        },
+
+        'Forest': {
+
+          wireHexColor: '#3a4a3a',
+
+          wirePentColor: '#344434',
+
+          hiddenColor: '#4a5a4a',
+
+          revealedColor: '#5a6a5a',
+
+          flagColor: '#00ff44',
+
+          mineColor: '#5a4a4a',
+
+          mineEmissive: '#403030',
+
+          numberColor: '#88cc88',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#ff66cc'
+
+        },
+
+        'Sunset': {
+
+          wireHexColor: '#4a3834',
+
+          wirePentColor: '#44322f',
+
+          hiddenColor: '#5a4844',
+
+          revealedColor: '#6a5854',
+
+          flagColor: '#ff4400',
+
+          mineColor: '#6a5a5a',
+
+          mineEmissive: '#604040',
+
+          numberColor: '#ffaa66',
+
+          emptyGlassOpacity: 0.32,
+
+          emptyGlassTint: '#66ffff'
+
+        },
+
+        'Ocean': {
+
+          wireHexColor: '#3a4a5a',
+
+          wirePentColor: '#344454',
+
+          hiddenColor: '#4a5a6a',
+
+          revealedColor: '#5a6a7a',
+
+          flagColor: '#00ccff',
+
+          mineColor: '#5a6a7a',
+
+          mineEmissive: '#304050',
+
+          numberColor: '#88ccff',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#ffcc66'
+
+        },
+
+        'Lava': {
+
+          wireHexColor: '#4a2a2a',
+
+          wirePentColor: '#442727',
+
+          hiddenColor: '#5a3a3a',
+
+          revealedColor: '#6a4a4a',
+
+          flagColor: '#ff2200',
+
+          mineColor: '#ff6d44',
+
+          mineEmissive: '#ff4040',
+
+          numberColor: '#ffcc88',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#66ffff'
+
+        },
+
+        'Plasma': {
+
+          wireHexColor: '#3a2a4a',
+
+          wirePentColor: '#342440',
+
+          hiddenColor: '#4a3a5a',
+
+          revealedColor: '#5a4a6a',
+
+          flagColor: '#ff00ff',
+
+          mineColor: '#7a5a8a',
+
+          mineEmissive: '#504070',
+
+          numberColor: '#ff88ff',
+
+          emptyGlassOpacity: 0.35,
+
+          emptyGlassTint: '#66ff66'
+
+        },
+
+        'Toxic': {
+
+          wireHexColor: '#3a4a2a',
+
+          wirePentColor: '#344427',
+
+          hiddenColor: '#4a5a3a',
+
+          revealedColor: '#5a6a4a',
+
+          flagColor: '#00ff00',
+
+          mineColor: '#7a8a5a',
+
+          mineEmissive: '#606040',
+
+          numberColor: '#aaff66',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#ff88ff'
+
+        },
+
+        'Cosmic': {
+
+          wireHexColor: '#3a3a4a',
+
+          wirePentColor: '#343444',
+
+          hiddenColor: '#4a4a5a',
+
+          revealedColor: '#5a5a6a',
+
+          flagColor: '#ff00ff',
+
+          mineColor: '#7a7a8a',
+
+          mineEmissive: '#404050',
+
+          numberColor: '#ccaaff',
+
+          emptyGlassOpacity: 0.3,
+
+          emptyGlassTint: '#ffee66'
+
+        }
+
+      };
+
+      // Track current preset for cycling (update global variables)
+      presetNames = Object.keys(palettes);
+      currentPresetIndex = presetNames.indexOf('Shadow');
+      if (currentPresetIndex === -1) currentPresetIndex = 0;
+
+      paletteController = gui.add({ preset: 'Shadow' }, 'preset', Object.keys(palettes)).name('Color Palette').onChange((name) => {
+        // Update current preset index when changed via GUI
+        currentPresetIndex = presetNames.indexOf(name);
+        if (currentPresetIndex === -1) currentPresetIndex = 0;
+        if (window.updatePresetDisplay) {
+          window.updatePresetDisplay();
+        }
+
+        if (window.applyPalette) {
+          window.applyPalette(palettes[name]);
+        }
+        
+        // Update palette grid active state if modal is open
+        if (paletteOverlay && paletteOverlay.classList.contains('visible')) {
+          updatePaletteGridActive();
+        }
+
+      });
+
+      // Copy to clipboard function
+
+      const copyConfig = () => {
+
+        const config = JSON.stringify(debugConfig, null, 2);
+
+        navigator.clipboard.writeText(config).then(() => {
+
+          console.log('Debug config copied to clipboard');
+
+        }).catch(err => {
+
+          console.error('Failed to copy:', err);
+
+          // Fallback for older browsers
+
+          const textArea = document.createElement('textarea');
+
+          textArea.value = config;
+
+          textArea.style.position = 'fixed';
+
+          textArea.style.opacity = '0';
+
+          document.body.appendChild(textArea);
+
+          textArea.select();
+
+          document.execCommand('copy');
+
+          document.body.removeChild(textArea);
+
+        });
+
+      };
+
+      gui.add({ copyConfig }, 'copyConfig').name('Copy Config to Clipboard');
+
+      // Apply Shadow palette at startup
+      if (window.applyPalette) {
+        window.applyPalette(palettes['Shadow']);
+      }
+
+      // Populate palette grid after palettes are initialized
+      populatePaletteGrid();
+
+      guiVisible = false;
+
+      gui.domElement.style.display = 'none';
+
+    }
+
+    function toggleGUI(){
+
+      if (!gui) initGUI();
+
+      guiVisible = !guiVisible;
+
+      gui.domElement.style.display = guiVisible ? 'block' : 'none';
+
+    }
+
+    addEventListener('keydown', (e)=>{
+
+      if (e.ctrlKey && e.shiftKey && e.altKey && e.key === 'D'){
+
+        e.preventDefault();
+
+        toggleGUI();
+
+      }
+
+      // P key cycles through presets
+      if (e.key === 'p' || e.key === 'P') {
+        // Don't cycle if typing in an input field
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          if (window.cyclePreset) {
+            window.cyclePreset();
+          }
+        }
+      }
+
+    });
+
+
+
+    // Start
+
+    initAudio();
+
+    // Apply initial light settings from debugConfig
+
+    updateLights();
+
+    // Apply initial fog settings from debugConfig
+
+    updateFog();
+
+    // Initialize and show debug panel by default
+
+    initGUI();
+
+    rebuildCore(debugConfig.tileDensity); runTests();
+    updateTimer(); // Initialize timer display
+    
+    // Initialize preset display after a short delay to ensure FPS element exists
+    setTimeout(() => {
+      // Attach click/touch handlers first (using event delegation, so it persists)
+      attachPresetClickHandler();
+      if (window.updatePresetDisplay) {
+        window.updatePresetDisplay();
+      }
+    }, 100);
+
+    addEventListener('resize', ()=>{ 
+      camera.aspect = innerWidth/innerHeight; 
+      camera.updateProjectionMatrix(); 
+      renderer.setSize(innerWidth, innerHeight); 
+      if (composer) composer.setSize(innerWidth, innerHeight);
+    });
+
+    let lastTime = performance.now();
+
+    let frameCount = 0;
+
+    let fps = 0;
+
+    renderer.setAnimationLoop(()=>{ 
+
+      // Smooth rotation interpolation for gradual movement using quaternions
+
+      const lerpFactor = damping;
+
+      // Slerp (spherical linear interpolation) for smooth quaternion rotation
+      sphereQuaternion.slerp(targetQuaternion, lerpFactor);
+
+      spherePivot.quaternion.copy(sphereQuaternion);
+
+      // Smooth panning interpolation
+
+      spherePosition.lerp(targetPosition, lerpFactor);
+
+      spherePivot.position.copy(spherePosition);
+
+      // Update number labels to always face camera and remain upright relative to screen
+
+      // Since camera is fixed and sphere rotates, we need to account for sphere rotation
+
+      // Only update matrices once per frame, not per label
+
+      tileGroup.updateMatrixWorld();
+
+      // Get parent rotation once and invert it
+
+      const tileGroupWorldQuaternion = new THREE.Quaternion();
+
+      tileGroup.getWorldQuaternion(tileGroupWorldQuaternion);
+
+      const parentInverseQuat = tileGroupWorldQuaternion.clone().invert();
+
+      // Pre-calculate camera direction in world space (it's constant)
+
+      const cameraPos = camera.position;
+
+      const cameraUpWorld = camera.up;
+
+      state.tiles.forEach(t => {
+
+        if (t.label) {
+
+          // Get world position of label (accounting for sphere rotation)
+
+          const worldPos = new THREE.Vector3();
+
+          t.label.getWorldPosition(worldPos);
+
+          // Direction from label to camera (in world space)
+
+          const dirToCamera = new THREE.Vector3().subVectors(cameraPos, worldPos).normalize();
+
+          // Camera's up vector in world space (this is our reference for "up" relative to screen)
+
+          const cameraUp = cameraUpWorld;
+
+          // Calculate right vector (perpendicular to camera direction and camera up)
+
+          let right = new THREE.Vector3().crossVectors(cameraUp, dirToCamera);
+
+          // Handle edge case where cameraUp and dirToCamera are parallel
+
+          if (right.lengthSq() < 0.01) {
+
+            right.set(1, 0, 0);
+
+            right.crossVectors(right, dirToCamera);
+
+            if (right.lengthSq() < 0.01) {
+
+              right.set(0, 0, 1);
+
+              right.crossVectors(right, dirToCamera);
+
+            }
+
+          }
+
+          right.normalize();
+
+          // Calculate up vector (perpendicular to right and camera direction)
+
+          const up = new THREE.Vector3().crossVectors(dirToCamera, right).normalize();
+
+          // Convert camera up to local space for proper orientation
+
+          const cameraUpLocal = cameraUp.clone().applyQuaternion(parentInverseQuat);
+
+          // Convert direction to local space
+
+          const dirToCameraLocal = dirToCamera.clone().applyQuaternion(parentInverseQuat);
+
+          dirToCameraLocal.normalize();
+
+          // Calculate right and up in local space
+
+          const cameraUpLocalNorm = cameraUpLocal.normalize();
+
+          let rightLocal = new THREE.Vector3().crossVectors(cameraUpLocalNorm, dirToCameraLocal);
+
+          if (rightLocal.lengthSq() < 0.01) {
+
+            rightLocal.set(1, 0, 0);
+
+            rightLocal.crossVectors(rightLocal, dirToCameraLocal);
+
+            if (rightLocal.lengthSq() < 0.01) {
+
+              rightLocal.set(0, 0, 1);
+
+              rightLocal.crossVectors(rightLocal, dirToCameraLocal);
+
+            }
+
+          }
+
+          rightLocal.normalize();
+
+          const upLocal = new THREE.Vector3().crossVectors(dirToCameraLocal, rightLocal).normalize();
+
+          // Build local rotation matrix
+
+          const localMatrix = new THREE.Matrix4();
+
+          localMatrix.makeBasis(rightLocal, upLocal, dirToCameraLocal);
+
+          t.label.setRotationFromMatrix(localMatrix)
+
+          // Apply rotation offsets from debug panel (in local space after billboard)
+
+          if (debugConfig.numberRotation !== 0) {
+
+            // Rotate around forward axis (local Z which points at camera)
+
+            const forwardAxis = new THREE.Vector3(0, 0, 1);
+
+            forwardAxis.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(forwardAxis, debugConfig.numberRotation * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationX !== 0) {
+
+            const localAxisX = new THREE.Vector3(1, 0, 0);
+
+            localAxisX.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisX.normalize(), debugConfig.numberRotationX * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationY !== 0) {
+
+            const localAxisY = new THREE.Vector3(0, 1, 0);
+
+            localAxisY.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisY.normalize(), debugConfig.numberRotationY * (Math.PI / 180));
+
+          }
+
+          if (debugConfig.numberRotationZ !== 0) {
+
+            const localAxisZ = new THREE.Vector3(0, 0, 1);
+
+            localAxisZ.applyQuaternion(t.label.quaternion);
+
+            t.label.rotateOnAxis(localAxisZ.normalize(), debugConfig.numberRotationZ * (Math.PI / 180));
+
+          }
+
+        }
+
+      });
+
+      // Camera is fixed, sphere rotates instead
+
+      // Flash unrevealed tiles when mine hunt reaches 80%+
+      const minePercent = state.totalMines > 0 ? (state.flags / state.totalMines) * 100 : 0;
+      if (minePercent >= 80 && !state.gameOver) {
+        // Slow pulsing animation for unrevealed tiles
+        const pulseSpeed = 0.003; // Slow pulse speed
+        const time = performance.now() * pulseSpeed;
+        const pulseFactor = (Math.sin(time) * 0.5 + 0.5); // 0 to 1
+        
+        // Much more dramatic pulsing: 0.08 (base) to 2.0 (peak) - very visible
+        const pulseIntensity = 0.08 + pulseFactor * 1.92; // 0.08 to 2.0
+        
+        // Parse base hidden color for color animation
+        const hiddenColorHex = debugConfig.hiddenColor.replace('#', '');
+        const baseR = parseInt(hiddenColorHex.substr(0, 2), 16);
+        const baseG = parseInt(hiddenColorHex.substr(2, 2), 16);
+        const baseB = parseInt(hiddenColorHex.substr(4, 2), 16);
+        
+        // Brighten the color during pulse (add white tint) - more dramatic
+        const brightenAmount = Math.round(pulseFactor * 100); // Add up to 100 brightness
+        const pulseR = Math.min(255, baseR + brightenAmount);
+        const pulseG = Math.min(255, baseG + brightenAmount);
+        const pulseB = Math.min(255, baseB + brightenAmount);
+        
+        // Update ALL unrevealed, unflagged, non-empty tiles directly
+        // This ensures we catch all tiles regardless of material reference
+        for (let i = 0; i < state.tiles.length; i++) {
+          const t = state.tiles[i];
+          if (!t.revealed && !t.flagged && !t.isEmpty) {
+            // Update material properties directly
+            if (t.mesh.material) {
+              t.mesh.material.emissiveIntensity = pulseIntensity;
+              // Very bright emissive color during pulse
+              const emissiveBright = 0x66 + Math.round(pulseFactor * 0x99); // 0x66 to 0xFF
+              t.mesh.material.emissive.setRGB(
+                emissiveBright / 255, 
+                emissiveBright / 255, 
+                emissiveBright / 255
+              );
+              // Brighten base color
+              t.mesh.material.color.setRGB(pulseR / 255, pulseG / 255, pulseB / 255);
+            }
+          }
+        }
+      } else {
+        // Reset properties for unrevealed tiles when below 80% or game over
+        const hiddenColorHex = debugConfig.hiddenColor.replace('#', '');
+        const baseR = parseInt(hiddenColorHex.substr(0, 2), 16);
+        const baseG = parseInt(hiddenColorHex.substr(2, 2), 16);
+        const baseB = parseInt(hiddenColorHex.substr(4, 2), 16);
+        
+        // Reset ALL unrevealed tiles
+        for (let i = 0; i < state.tiles.length; i++) {
+          const t = state.tiles[i];
+          if (!t.revealed && !t.flagged && !t.isEmpty && t.mesh.material) {
+            // Check if this tile uses matHidden (shared material)
+            if (t.mesh.material === matHidden) {
+              // Reset shared material
+              matHidden.emissiveIntensity = 0.05; // Updated to match new base value
+              matHidden.emissive.setRGB(0x08 / 255, 0x08 / 255, 0x08 / 255); // Updated to match new darker value
+              matHidden.color.setRGB(baseR / 255, baseG / 255, baseB / 255);
+              break; // Only need to reset once since it's shared
+            } else {
+              // Reset individual material
+              t.mesh.material.emissiveIntensity = 0.05; // Updated to match new base value
+              t.mesh.material.emissive.setRGB(0x08 / 255, 0x08 / 255, 0x08 / 255); // Updated to match new darker value
+              t.mesh.material.color.setRGB(baseR / 255, baseG / 255, baseB / 255);
+            }
+          }
+        }
+      }
+
+      if (composer) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
+
+      frameCount++;
+
+      const now = performance.now();
+
+      const delta = now - lastTime;
+
+      if (delta >= 1000){
+
+        fps = Math.round((frameCount * 1000) / delta);
+
+        const fpsEl = document.getElementById('fps');
+        const presetEl = document.getElementById('fpsPreset');
+        if (fpsEl) {
+          const presetName = (presetNames.length > 0 && presetNames[currentPresetIndex]) ? presetNames[currentPresetIndex] : 'Shadow';
+          if (presetEl) {
+            // Update only the preset name if span exists
+            presetEl.textContent = presetName;
+            // Update FPS number by replacing text before the span
+            const textBefore = `FPS: ${fps} | `;
+            // Find the text node before the span and update it, or create it
+            let foundText = false;
+            for (let i = 0; i < fpsEl.childNodes.length; i++) {
+              const node = fpsEl.childNodes[i];
+              if (node.nodeType === Node.TEXT_NODE && node.nextSibling === presetEl) {
+                node.textContent = textBefore;
+                foundText = true;
+                break;
+              }
+            }
+            if (!foundText) {
+              // Insert text node before the preset span
+              fpsEl.insertBefore(document.createTextNode(textBefore), presetEl);
+            }
+          } else {
+            // Fallback: create the span if it doesn't exist
+            fpsEl.innerHTML = `FPS: ${fps} | <span class="fps-preset" id="fpsPreset">${presetName}</span>`;
+            attachPresetClickHandler();
+          }
+        }
+
+        frameCount = 0;
+
+        lastTime = now;
+
+      }
+
+    });
+
+  </script>
+
+</body>
+
+</html>
+
