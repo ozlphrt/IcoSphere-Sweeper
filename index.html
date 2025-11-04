@@ -868,7 +868,7 @@
 
       tileDensity: 15,
 
-      mineRatio: 1,
+      mineRatio: 5,
 
       immortalMode: false,
 
@@ -1346,126 +1346,57 @@
 
             for (let i=indices.length-1;i>0;i--){ const j=(Math.random()* (i+1))|0; [indices[i],indices[j]]=[indices[j],indices[i]]; }
 
-            // Place mines with very strict clustering - NO isolated mines allowed
-            // Every mine MUST be adjacent to at least one other mine
+            // Place mines with light clustering - slight preference for clusters but mostly random
+            // This allows more isolated mines to prevent huge empty areas
             const placedMines = new Set();
-            const remainingIndices = [...indices];
             
-            // Step 1: Create initial tight clusters (groups of 3-4 mines)
-            const clusterCount = Math.max(1, Math.floor(mineTarget / 4)); // Aim for clusters of ~4 mines
-            for (let cluster = 0; cluster < clusterCount && placed < mineTarget && remainingIndices.length > 0; cluster++) {
-              // Pick a random seed position
-              const seedIdx = remainingIndices[Math.floor(Math.random() * remainingIndices.length)];
-              if (forbidden.has(seedIdx) || state.tiles[seedIdx].isEmpty) continue;
+            // Place mines with light preference for clustering (40% chance to prefer near existing mines)
+            // but allow isolated mines (60% chance) to prevent huge empty areas
+            for (const idx of indices) { 
+              if (placed >= mineTarget) break;
               
-              // Place seed mine
-              state.tiles[seedIdx].mine = true;
-              placedMines.add(seedIdx);
-              placed++;
-              const seedIdxPos = remainingIndices.indexOf(seedIdx);
-              if (seedIdxPos > -1) remainingIndices.splice(seedIdxPos, 1);
-              
-              // Build cluster around seed - place 2-3 adjacent mines to form a tight cluster
-              const clusterTarget = Math.min(3, mineTarget - placed); // Aim for 3-4 total mines per cluster
-              let clusterPlaced = 1; // Already placed seed
-              
-              // Get all neighbors of the cluster so far
-              let clusterNeighbors = new Set();
-              for (const mineIdx of placedMines) {
-                for (const nb of state.neighbors[mineIdx]) {
-                  if (!placedMines.has(nb) && !forbidden.has(nb) && !state.tiles[nb].isEmpty) {
-                    clusterNeighbors.add(nb);
-                  }
-                }
-              }
-              
-              // Place additional mines in the cluster
-              while (clusterPlaced < clusterTarget && clusterNeighbors.size > 0 && placed < mineTarget) {
-                const neighborArray = Array.from(clusterNeighbors).filter(idx => remainingIndices.includes(idx));
-                if (neighborArray.length === 0) break;
-                
-                const chosenIdx = neighborArray[Math.floor(Math.random() * neighborArray.length)];
-                state.tiles[chosenIdx].mine = true;
-                placedMines.add(chosenIdx);
-                placed++;
-                clusterPlaced++;
-                
-                // Remove from remaining indices
-                const chosenIdxPos = remainingIndices.indexOf(chosenIdx);
-                if (chosenIdxPos > -1) remainingIndices.splice(chosenIdxPos, 1);
-                
-                // Remove from cluster neighbors
-                clusterNeighbors.delete(chosenIdx);
-                
-                // Add new neighbors to cluster neighbors
-                for (const nb of state.neighbors[chosenIdx]) {
-                  if (!placedMines.has(nb) && !forbidden.has(nb) && !state.tiles[nb].isEmpty) {
-                    clusterNeighbors.add(nb);
-                  }
-                }
-              }
-            }
-            
-            // Step 2: Place remaining mines ONLY adjacent to existing mines
-            // This ensures zero isolated mines
-            while (placed < mineTarget) {
-              // Find ALL candidate positions that are adjacent to at least one mine
-              const candidateIndices = remainingIndices.filter(idx => {
-                if (forbidden.has(idx) || state.tiles[idx].isEmpty || placedMines.has(idx)) return false;
-                // Must have at least one mine neighbor
+              // Check if this position has a mine neighbor
+              let hasMineNeighbor = false;
+              if (placedMines.size > 0) {
                 for (const nb of state.neighbors[idx]) {
-                  if (placedMines.has(nb)) return true;
+                  if (placedMines.has(nb)) {
+                    hasMineNeighbor = true;
+                    break;
+                  }
                 }
-                return false;
-              });
+              }
               
-              if (candidateIndices.length > 0) {
-                // Place mine at a random candidate position (always adjacent to existing mine)
-                const chosenIdx = candidateIndices[Math.floor(Math.random() * candidateIndices.length)];
-                state.tiles[chosenIdx].mine = true;
-                placedMines.add(chosenIdx);
-                placed++;
-                
-                // Remove from remaining indices
-                const chosenIdxPos = remainingIndices.indexOf(chosenIdx);
-                if (chosenIdxPos > -1) remainingIndices.splice(chosenIdxPos, 1);
-              } else {
-                // No more valid positions - this should be rare, but if it happens,
-                // we need to expand clusters by finding positions that can reach existing mines
-                // through a chain of neighbors (expanding clusters)
-                let foundExpansion = false;
-                
-                // Find positions that are neighbors of neighbors of existing mines
-                for (const mineIdx of Array.from(placedMines)) {
-                  for (const neighbor of state.neighbors[mineIdx]) {
-                    if (placedMines.has(neighbor) || forbidden.has(neighbor) || state.tiles[neighbor].isEmpty) continue;
-                    
-                    // Check if this neighbor's neighbors include other mines (forming a bridge)
-                    let hasMineNeighbor = false;
-                    for (const nb2 of state.neighbors[neighbor]) {
-                      if (placedMines.has(nb2)) {
-                        hasMineNeighbor = true;
+              // If no mine neighbors, 60% chance to place anyway (allow isolated mines)
+              // Only 40% chance to skip and try to find a better position
+              if (!hasMineNeighbor && placedMines.size > 0 && Math.random() > 0.6) {
+                // Skip this position, try to find a better one near existing mines (max 2 attempts)
+                let foundBetter = false;
+                for (let attempt = 0; attempt < 2 && !foundBetter; attempt++) {
+                  const altIdx = indices[Math.floor(Math.random() * indices.length)];
+                  if (!placedMines.has(altIdx) && !forbidden.has(altIdx) && !state.tiles[altIdx].isEmpty) {
+                    // Check if this alternative has a mine neighbor
+                    for (const nb of state.neighbors[altIdx]) {
+                      if (placedMines.has(nb)) {
+                        state.tiles[altIdx].mine = true;
+                        placedMines.add(altIdx);
+                        placed++;
+                        foundBetter = true;
                         break;
                       }
                     }
-                    
-                    if (hasMineNeighbor && remainingIndices.includes(neighbor)) {
-                      state.tiles[neighbor].mine = true;
-                      placedMines.add(neighbor);
-                      placed++;
-                      const neighborPos = remainingIndices.indexOf(neighbor);
-                      if (neighborPos > -1) remainingIndices.splice(neighborPos, 1);
-                      foundExpansion = true;
-                      break;
-                    }
                   }
-                  if (foundExpansion) break;
                 }
-                
-                // Last resort: if we still can't place, stop (we've reached the maximum possible clustering)
-                if (!foundExpansion) {
-                  break; // Can't place more without creating isolated mines
+                // If we didn't find a better position, place here anyway (allow isolated mine)
+                if (!foundBetter) {
+                  state.tiles[idx].mine = true;
+                  placedMines.add(idx);
+                  placed++;
                 }
+              } else {
+                // Place mine here (either has neighbor or early in placement, or 60% chance for isolated)
+                state.tiles[idx].mine = true;
+                placedMines.add(idx);
+                placed++;
               }
             }
 
@@ -1517,7 +1448,7 @@
           const safeIndices = state.tiles.map((t, i) => i).filter(i => !state.tiles[i].mine && !state.tiles[i].isEmpty);
           const revealCount = Math.max(1, Math.floor(safeIndices.length * debugConfig.initialRevealPercent / 100));
           
-          // Shuffle safe indices for reveal
+          // Shuffle safe indices for random initial reveal
           for (let i = safeIndices.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [safeIndices[i], safeIndices[j]] = [safeIndices[j], safeIndices[i]];
@@ -4000,7 +3931,7 @@
 
       f1.add(debugConfig, 'tileDensity', 1, 20, 1).name('Tile Density').onChange((val)=>{ rebuildCore(Math.floor(val)); });
 
-      f1.add(debugConfig, 'mineRatio', 1, 30, 1).name('Mine %');
+      f1.add(debugConfig, 'mineRatio', 5, 30, 1).name('Mine %');
 
       f1.add(debugConfig, 'emptyTileRatio', 0, 50, 1).name('Empty Tile %').onChange(()=>{ rebuildCore(state.f); });
 
