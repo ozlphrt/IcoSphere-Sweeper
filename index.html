@@ -596,8 +596,9 @@
     let particleGroup = new THREE.Group(); scene.add(particleGroup);
 
     // Sphere rotation state for manual rotation
-    let sphereRotation = { x: 0, y: 0 };
-    let targetRotation = { x: 0, y: 0 };
+    // Use quaternion for rotation to avoid gimbal lock and maintain consistent screen-space rotation
+    let sphereQuaternion = new THREE.Quaternion();
+    let targetQuaternion = new THREE.Quaternion();
     let spherePosition = new THREE.Vector3(0, 0, 0);
     let targetPosition = new THREE.Vector3(0, 0, 0);
     let isRotating = false;
@@ -1706,7 +1707,7 @@
 
       state.polys = buildDualPolygons(geo.verts, geo.faces); state.neighbors = buildAdjacency(state.polys);
 
-      buildTiles(); state.firstClick = true; state.gameOver=false; state.safeRevealed=0; state.totalMines=0; state.flags=0; updateCounters(); spherePivot.position.set(0, 0, 0); targetPosition.set(0, 0, 0); spherePosition.set(0, 0, 0); targetRotation.x = 0; targetRotation.y = 0; sphereRotation.x = 0; sphereRotation.y = 0;
+      buildTiles(); state.firstClick = true; state.gameOver=false; state.safeRevealed=0; state.totalMines=0; state.flags=0; updateCounters(); spherePivot.position.set(0, 0, 0); targetPosition.set(0, 0, 0); spherePosition.set(0, 0, 0); sphereQuaternion.set(0, 0, 0, 1); targetQuaternion.set(0, 0, 0, 1);
       
       // Place mines and reveal initial tiles automatically
       placeMines(-1, debugConfig.mineRatio); state.firstClick = false;
@@ -1825,11 +1826,20 @@
 
           isRotating = true;
 
-          targetRotation.y += deltaX * rotationSpeed;
-
-          targetRotation.x += deltaY * rotationSpeed;
-
-          // Allow endless rotation by removing limits
+          // Apply rotations in screen space (world space relative to camera)
+          // This ensures swiping left always rotates left from current view, regardless of sphere orientation
+          const cameraForward = new THREE.Vector3();
+          camera.getWorldDirection(cameraForward);
+          const cameraRight = new THREE.Vector3().crossVectors(cameraForward, camera.up).normalize();
+          const cameraUp = camera.up.clone();
+          
+          // Rotate around camera's up axis (world Y) for horizontal movement
+          const rotY = new THREE.Quaternion().setFromAxisAngle(cameraUp, -deltaX * rotationSpeed);
+          // Rotate around camera's right axis for vertical movement
+          const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, -deltaY * rotationSpeed);
+          
+          // Apply rotations in world space by multiplying quaternions
+          targetQuaternion.premultiply(rotY).premultiply(rotX);
 
           lastMousePos = { x: e.clientX, y: e.clientY };
 
@@ -2034,8 +2044,16 @@
           const deltaX = e.touches[0].clientX - lastTouchPos.x;
           const deltaY = e.touches[0].clientY - lastTouchPos.y;
           
-          targetRotation.y += deltaX * rotationSpeed * 1.5;
-          targetRotation.x += deltaY * rotationSpeed * 1.5;
+          // Apply rotations in screen space for touch
+          const cameraForward = new THREE.Vector3();
+          camera.getWorldDirection(cameraForward);
+          const cameraRight = new THREE.Vector3().crossVectors(cameraForward, camera.up).normalize();
+          const cameraUp = camera.up.clone();
+          
+          const rotY = new THREE.Quaternion().setFromAxisAngle(cameraUp, -deltaX * rotationSpeed * 1.5);
+          const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, -deltaY * rotationSpeed * 1.5);
+          
+          targetQuaternion.premultiply(rotY).premultiply(rotX);
           
           lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         }
@@ -2842,17 +2860,14 @@
 
     renderer.setAnimationLoop(()=>{ 
 
-      // Smooth rotation interpolation for gradual movement
+      // Smooth rotation interpolation for gradual movement using quaternions
 
       const lerpFactor = damping;
 
-      sphereRotation.x += (targetRotation.x - sphereRotation.x) * lerpFactor;
+      // Slerp (spherical linear interpolation) for smooth quaternion rotation
+      sphereQuaternion.slerp(targetQuaternion, lerpFactor);
 
-      sphereRotation.y += (targetRotation.y - sphereRotation.y) * lerpFactor;
-
-      spherePivot.rotation.x = sphereRotation.x;
-
-      spherePivot.rotation.y = sphereRotation.y;
+      spherePivot.quaternion.copy(sphereQuaternion);
 
       // Smooth panning interpolation
 
