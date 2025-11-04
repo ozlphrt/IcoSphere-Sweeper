@@ -2201,8 +2201,9 @@
     resetScoreboardTimer();
     
     // Scoreboard button handlers
-    document.getElementById('scoreboardReset').addEventListener('click', ()=>{ rebuildCore(state.f); });
+    document.getElementById('scoreboardReset').addEventListener('click', ()=>{ rebuildCore(state.f); resetScoreboardTimer(); });
     document.getElementById('scoreboardSound').addEventListener('click', ()=>{
+      resetScoreboardTimer();
       debugConfig.soundEnabled = !debugConfig.soundEnabled;
       // Update button icon
       const soundBtn = document.getElementById('scoreboardSound');
