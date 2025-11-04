@@ -1834,9 +1834,9 @@
           const cameraUp = camera.up.clone();
           
           // Rotate around camera's up axis (world Y) for horizontal movement
-          const rotY = new THREE.Quaternion().setFromAxisAngle(cameraUp, -deltaX * rotationSpeed);
+          const rotY = new THREE.Quaternion().setFromAxisAngle(cameraUp, deltaX * rotationSpeed);
           // Rotate around camera's right axis for vertical movement
-          const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, -deltaY * rotationSpeed);
+          const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, deltaY * rotationSpeed);
           
           // Apply rotations in world space by multiplying quaternions
           targetQuaternion.premultiply(rotY).premultiply(rotX);
@@ -2050,8 +2050,8 @@
           const cameraRight = new THREE.Vector3().crossVectors(cameraForward, camera.up).normalize();
           const cameraUp = camera.up.clone();
           
-          const rotY = new THREE.Quaternion().setFromAxisAngle(cameraUp, -deltaX * rotationSpeed * 1.5);
-          const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, -deltaY * rotationSpeed * 1.5);
+          const rotY = new THREE.Quaternion().setFromAxisAngle(cameraUp, deltaX * rotationSpeed * 1.5);
+          const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, deltaY * rotationSpeed * 1.5);
           
           targetQuaternion.premultiply(rotY).premultiply(rotX);
           
