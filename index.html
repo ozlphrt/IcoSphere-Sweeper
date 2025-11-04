@@ -990,9 +990,6 @@
 
     const matMine = new THREE.MeshStandardMaterial({ color: debugConfig.mineColor, emissive: debugConfig.mineEmissive, roughness: 0.6, side: THREE.FrontSide });
 
-    // Shared hazard stripe texture for flagged tile extrusions (lazy initialization)
-    let hazardStripeTexture = null;
-
     // Semi-transparent glass material for empty cells
     const matEmpty = new THREE.MeshStandardMaterial({ 
       transparent: true, 
@@ -1179,7 +1176,7 @@
 
         tileGroup.add(mesh);
 
-        return { index:i, mesh, center, mine:false, count:0, flagged:false, revealed:false, label:null, flagMaterial:null, isEmpty:false, adjacentGlowMaterial:null, extrudeGroup:null, sideGeometry:null, sideMesh:null, safeIndicatorMaterial:null };
+        return { index:i, mesh, center, mine:false, count:0, flagged:false, revealed:false, label:null, flagMaterial:null, isEmpty:false, adjacentGlowMaterial:null, safeIndicatorMaterial:null };
 
       });
 
@@ -1322,7 +1319,7 @@
           setTimeout(() => {
             state.totalMines = mineTarget; state.flags = 0; state.safeRevealed = 0; state.gameOver=false; state.won = false; state.lives = 3; lifeLostInCurrentReveal = false; hideGameOver(); updateCounters(); updateLives();
 
-            state.tiles.forEach(t=>{ t.mine=false; t.count=0; t.flagged=false; t.revealed=false; if (t.label){ tileGroup.remove(t.label); t.label.material.map.dispose(); t.label.material.dispose(); t.label=null; } if (t.flagMaterial){ t.flagMaterial.dispose(); t.flagMaterial=null; } if (t.adjacentGlowMaterial){ t.adjacentGlowMaterial.dispose(); t.adjacentGlowMaterial=null; } if (t.safeIndicatorMaterial){ t.safeIndicatorMaterial.dispose(); t.safeIndicatorMaterial=null; } if (t.extrudeGroup){ tileGroup.remove(t.extrudeGroup); if (t.sideMesh && t.sideMesh.material){ t.sideMesh.material.dispose(); } t.sideMesh=null; if (t.sideGeometry){ t.sideGeometry.dispose(); } t.sideGeometry=null; t.extrudeGroup=null; } t.mesh.material = t.isEmpty ? matEmpty : matHidden; });
+            state.tiles.forEach(t=>{ t.mine=false; t.count=0; t.flagged=false; t.revealed=false; if (t.label){ tileGroup.remove(t.label); t.label.material.map.dispose(); t.label.material.dispose(); t.label=null; } if (t.flagMaterial){ t.flagMaterial.dispose(); t.flagMaterial=null; } if (t.adjacentGlowMaterial){ t.adjacentGlowMaterial.dispose(); t.adjacentGlowMaterial=null; } if (t.safeIndicatorMaterial){ t.safeIndicatorMaterial.dispose(); t.safeIndicatorMaterial=null; } t.mesh.material = t.isEmpty ? matEmpty : matHidden; });
 
             const forbidden = excludeIndex >= 0 ? new Set([excludeIndex, ...state.neighbors[excludeIndex]]) : new Set();
 
@@ -1502,21 +1499,6 @@
         t.adjacentGlowMaterial = null;
       }
       
-      // Remove extruded sides if revealed
-      if (t.extrudeGroup) {
-        tileGroup.remove(t.extrudeGroup);
-        if (t.sideMesh) {
-          if (t.sideMesh.material) {
-            t.sideMesh.material.dispose();
-          }
-          t.sideMesh = null;
-        }
-        if (t.sideGeometry) {
-          t.sideGeometry.dispose();
-          t.sideGeometry = null;
-        }
-        t.extrudeGroup = null;
-      }
 
       if (!isInitialReveal) {
 
@@ -1630,8 +1612,8 @@
 
       if (state.gameOver) return;
       
-      // CRITICAL: Block reveal if right-click flagging just occurred
-      if (rightClickHandled || contextMenuHandled) {
+      // CRITICAL: Block reveal if right-click flagging just occurred (mouse) or touch flagging just occurred (touch)
+      if (rightClickHandled || contextMenuHandled || touchFlagHandled) {
         return;
       }
 
@@ -1849,112 +1831,6 @@
 
     }
 
-    // Create hazard stripe texture (diagonal black and yellow)
-    function createHazardStripeTexture() {
-      const canvas = document.createElement('canvas');
-      const size = 256;
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext('2d');
-      
-      // Create diagonal stripes pattern
-      const stripeWidth = 16;
-      const angle = Math.PI / 4; // 45 degrees
-      
-      // Fill with yellow
-      ctx.fillStyle = '#FFFF00';
-      ctx.fillRect(0, 0, size, size);
-      
-      // Draw black diagonal stripes
-      ctx.fillStyle = '#000000';
-      ctx.save();
-      ctx.translate(size / 2, size / 2);
-      ctx.rotate(angle);
-      ctx.translate(-size / 2, -size / 2);
-      
-      for (let i = -size; i < size * 2; i += stripeWidth * 2) {
-        ctx.fillRect(i, 0, stripeWidth, size * 2);
-      }
-      
-      ctx.restore();
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(2, 2);
-      texture.needsUpdate = true;
-      
-      return texture;
-    }
-    
-    // Create extruded sides geometry for flagged tiles
-    // skipEdges: Set of edge indices to skip (edges adjacent to other flagged tiles)
-    function createExtrudedSides(poly, center, extrusionDistance, skipEdges = new Set()) {
-      const n = poly.length;
-      const positions = [];
-      const normals = [];
-      const uvs = [];
-      
-      // Create side faces for each edge
-      for (let i = 0; i < n; i++) {
-        // Skip this edge if it's adjacent to another flagged tile
-        if (skipEdges.has(i)) {
-          continue;
-        }
-        
-        const a = poly[i];
-        const b = poly[(i + 1) % n];
-        
-        // Calculate edge direction
-        const edgeDir = new THREE.Vector3().subVectors(b, a).normalize();
-        // Calculate side normal (perpendicular to edge and pointing outward)
-        // Cross product: edgeDir x center gives outward normal (right-hand rule)
-        const sideNormal = new THREE.Vector3().crossVectors(edgeDir, center).normalize();
-        // Ensure it points outward (away from sphere center) by checking dot product with center
-        // If negative, flip it (though this shouldn't be necessary with correct winding)
-        
-        // Bottom vertices (at original position)
-        const aBottom = a.clone();
-        const bBottom = b.clone();
-        
-        // Top vertices (extruded outward)
-        const aTop = a.clone().addScaledVector(center, extrusionDistance);
-        const bTop = b.clone().addScaledVector(center, extrusionDistance);
-        
-        // Create two triangles for this side face
-        // Triangle 1: aBottom, bBottom, aTop
-        positions.push(aBottom.x, aBottom.y, aBottom.z);
-        positions.push(bBottom.x, bBottom.y, bBottom.z);
-        positions.push(aTop.x, aTop.y, aTop.z);
-        
-        // Triangle 2: bBottom, bTop, aTop
-        positions.push(bBottom.x, bBottom.y, bBottom.z);
-        positions.push(bTop.x, bTop.y, bTop.z);
-        positions.push(aTop.x, aTop.y, aTop.z);
-        
-        // Add normals (side normal for all vertices)
-        for (let j = 0; j < 6; j++) {
-          normals.push(sideNormal.x, sideNormal.y, sideNormal.z);
-        }
-        
-        // Add UVs for texture mapping (diagonal pattern)
-        const edgeLength = a.distanceTo(b);
-        uvs.push(0, 0);
-        uvs.push(edgeLength * 2, 0);
-        uvs.push(0, extrusionDistance * 2);
-        uvs.push(edgeLength * 2, 0);
-        uvs.push(edgeLength * 2, extrusionDistance * 2);
-        uvs.push(0, extrusionDistance * 2);
-      }
-      
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-      
-      return geometry;
-    }
-
     function updateFlagMaterial(i){
 
       const t = state.tiles[i];
@@ -2030,90 +1906,6 @@
       }
 
       t.mesh.material = t.flagMaterial;
-      
-      // Create extruded sides with hazard stripes
-      // If extrusion already exists, remove it first (neighbors may have changed)
-      if (t.extrudeGroup) {
-        tileGroup.remove(t.extrudeGroup);
-        if (t.sideMesh) {
-          if (t.sideMesh.material) {
-            t.sideMesh.material.dispose();
-          }
-          t.sideMesh = null;
-        }
-        if (t.sideGeometry) {
-          t.sideGeometry.dispose();
-          t.sideGeometry = null;
-        }
-        t.extrudeGroup = null;
-      }
-      
-      // Always rebuild extrusion (neighbors may have changed their flag status)
-      {
-        // Lazy initialize hazard stripe texture on first use
-        if (!hazardStripeTexture) {
-          hazardStripeTexture = createHazardStripeTexture();
-        }
-        
-        const poly = state.polys[i];
-        const extrusionDistance = 0.02; // Extrude 2% of radius outward
-        
-        // Determine which edges to skip (edges adjacent to other flagged tiles)
-        const skipEdges = new Set();
-        for (let edgeIdx = 0; edgeIdx < poly.length; edgeIdx++) {
-          const edgeStart = poly[edgeIdx];
-          const edgeEnd = poly[(edgeIdx + 1) % poly.length];
-          
-          // Check each neighbor to see if it's flagged and shares this edge
-          for (const neighborIdx of state.neighbors[i]) {
-            const neighbor = state.tiles[neighborIdx];
-            if (neighbor.flagged) {
-              // Check if neighbor's polygon shares both vertices of this edge
-              const neighborPoly = state.polys[neighborIdx];
-              const s = 1e-5; // Tolerance for vertex matching
-              let hasStart = false;
-              let hasEnd = false;
-              
-              for (const v of neighborPoly) {
-                const distToStart = v.distanceTo(edgeStart);
-                const distToEnd = v.distanceTo(edgeEnd);
-                if (distToStart < s) hasStart = true;
-                if (distToEnd < s) hasEnd = true;
-              }
-              
-              // If neighbor shares both vertices, it shares this edge - skip it
-              if (hasStart && hasEnd) {
-                skipEdges.add(edgeIdx);
-                break; // Found a flagged neighbor for this edge, no need to check others
-              }
-            }
-          }
-        }
-        
-        // Create geometry for extruded sides (skipping edges adjacent to flagged tiles)
-        t.sideGeometry = createExtrudedSides(poly, t.center, extrusionDistance, skipEdges);
-        
-        // Create material with hazard stripe texture
-        const sideMaterial = new THREE.MeshStandardMaterial({
-          map: hazardStripeTexture,
-          roughness: 0.7,
-          metalness: 0.1,
-          side: THREE.DoubleSide
-        });
-        
-        // Create mesh for extruded sides
-        t.sideMesh = new THREE.Mesh(t.sideGeometry, sideMaterial);
-        
-        // Create a group to hold the extruded sides (for potential future transforms)
-        t.extrudeGroup = new THREE.Group();
-        t.extrudeGroup.add(t.sideMesh);
-        
-        // Add to tile group so it follows the sphere rotation
-        tileGroup.add(t.extrudeGroup);
-      }
-      
-      // Projector lights removed for performance - too many SpotLights cause FPS drops
-      // The extrusion with hazard stripes provides sufficient visual feedback
 
     }
 
@@ -2383,31 +2175,6 @@
       if (t.flagged){
 
         updateFlagMaterial(i);
-        
-        // Update adjacent flagged tiles to rebuild their extrusions
-        // (they need to remove the shared edge with this newly flagged tile)
-        for (const nbIndex of state.neighbors[i]) {
-          const neighbor = state.tiles[nbIndex];
-          if (neighbor.flagged) {
-            // Force rebuild by clearing existing extrusion
-            if (neighbor.extrudeGroup) {
-              tileGroup.remove(neighbor.extrudeGroup);
-              if (neighbor.sideMesh) {
-                if (neighbor.sideMesh.material) {
-                  neighbor.sideMesh.material.dispose();
-                }
-                neighbor.sideMesh = null;
-              }
-              if (neighbor.sideGeometry) {
-                neighbor.sideGeometry.dispose();
-                neighbor.sideGeometry = null;
-              }
-              neighbor.extrudeGroup = null;
-            }
-            // Rebuild extrusion with updated neighbor information
-            updateFlagMaterial(nbIndex);
-          }
-        }
 
       } else {
 
@@ -2418,49 +2185,8 @@
           t.flagMaterial = null;
 
         }
-        
-        // Remove extruded sides
-        if (t.extrudeGroup) {
-          tileGroup.remove(t.extrudeGroup);
-          if (t.sideMesh) {
-            if (t.sideMesh.material) {
-              t.sideMesh.material.dispose();
-            }
-            t.sideMesh = null;
-          }
-          if (t.sideGeometry) {
-            t.sideGeometry.dispose();
-            t.sideGeometry = null;
-          }
-          t.extrudeGroup = null;
-        }
 
         t.mesh.material = matHidden;
-        
-        // Update adjacent flagged tiles to rebuild their extrusions
-        // (they need to add back the shared edge since this tile is no longer flagged)
-        for (const nbIndex of state.neighbors[i]) {
-          const neighbor = state.tiles[nbIndex];
-          if (neighbor.flagged) {
-            // Force rebuild by clearing existing extrusion
-            if (neighbor.extrudeGroup) {
-              tileGroup.remove(neighbor.extrudeGroup);
-              if (neighbor.sideMesh) {
-                if (neighbor.sideMesh.material) {
-                  neighbor.sideMesh.material.dispose();
-                }
-                neighbor.sideMesh = null;
-              }
-              if (neighbor.sideGeometry) {
-                neighbor.sideGeometry.dispose();
-                neighbor.sideGeometry = null;
-              }
-              neighbor.extrudeGroup = null;
-            }
-            // Rebuild extrusion with updated neighbor information
-            updateFlagMaterial(nbIndex);
-          }
-        }
         
         // Remove glow from adjacent tiles when flag is removed
         for (const nbIndex of state.neighbors[i]) {
@@ -3485,37 +3211,38 @@
     let touchStartDistance = 0;
     let touchMode = null; // 'rotate', 'pan'
     let lastTouchPos = null;
-    let longPressTimer = null;
+    let touchStartTime = 0;
+    let touchMoved = false; // Track if touch moved during gesture
     let lastTapTime = 0;
     let lastTapPos = null;
     let doubleTapTimer = null;
-    const DOUBLE_TAP_DELAY = 300; // ms between taps
+    let touchFlagHandled = false; // Track if touch flagging occurred - blocks subsequent reveals
+    let touchFlagTime = 0; // Track when touch flagging occurred
+    const DOUBLE_TAP_DELAY = 150; // ms between taps (reduced for better responsiveness)
     const DOUBLE_TAP_DISTANCE = 50; // pixels max distance
+    const TAP_MAX_DURATION = 200; // ms - taps longer than this are considered holds (flag)
+    const TAP_MAX_MOVEMENT = 5; // pixels - movement beyond this is considered a drag (flag)
+    let pendingReveal = null; // Track pending reveal to cancel if double tap occurs
 
     renderer.domElement.addEventListener('touchstart', (e) => {
       e.preventDefault();
+      
+      // Clear any stale touch flagging state when a new touch starts
+      // This prevents blocking legitimate reveals after the timeout period
+      if (touchFlagHandled && Date.now() - touchFlagTime > 300) {
+        touchFlagHandled = false;
+        touchFlagTime = 0;
+      }
       
       if (e.touches.length === 1) {
         // Single touch - prepare for rotation or tap
         touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        touchStartTime = Date.now();
+        touchMoved = false; // Reset movement tracking
         touchMode = 'rotate';
         isRotating = false;
         wasDragging = false;
-        
-        // Set up long press timer for flagging
-        longPressTimer = setTimeout(() => {
-          if (touchStartPos && !wasDragging) {
-            const fakeEvent = { clientX: touchStartPos.x, clientY: touchStartPos.y };
-            const idx = pickTile(fakeEvent);
-            if (idx >= 0 && !state.gameOver) {
-              toggleFlag(idx);
-            }
-            touchMode = null; // Prevent tap action
-            // Vibrate if supported
-            if (navigator.vibrate) navigator.vibrate(50);
-          }
-        }, 600);
       } else if (e.touches.length === 2) {
         // Two finger touch - pan
         touchMode = 'pan';
@@ -3536,12 +3263,9 @@
         const dy = e.touches[0].clientY - touchStartPos.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        // Cancel long press and double tap timer if moved significantly (reduce sensitivity for Android)
-        if (dist > 10) {
-          if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-          }
+        // Track if touch moved - any movement means it's not a simple tap (will flag instead)
+        if (dist > TAP_MAX_MOVEMENT) {
+          touchMoved = true; // Mark that touch moved - this will trigger flag on release
           if (doubleTapTimer) {
             clearTimeout(doubleTapTimer);
             doubleTapTimer = null;
@@ -3602,15 +3326,10 @@
     renderer.domElement.addEventListener('touchend', (e) => {
       e.preventDefault();
       
-      // Clear long press timer
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
-      
       if (e.touches.length === 0) {
         // All touches ended
-        if (touchMode === 'rotate' && !wasDragging && touchStartPos) {
+        if (touchMode === 'rotate' && touchStartPos) {
+          const touchDuration = Date.now() - touchStartTime;
           const currentTime = Date.now();
           const timeSinceLastTap = currentTime - lastTapTime;
           const tapDistance = lastTapPos ? 
@@ -3618,41 +3337,114 @@
             Infinity;
           
           // Check for double tap
-          if (timeSinceLastTap < DOUBLE_TAP_DELAY && tapDistance < DOUBLE_TAP_DISTANCE && lastTapPos) {
+          // Only flag on double tap if it wasn't a rotation/drag gesture
+          if (timeSinceLastTap < DOUBLE_TAP_DELAY && tapDistance < DOUBLE_TAP_DISTANCE && lastTapPos && !touchMoved && !wasDragging) {
             // Double tap - flag
+            // Cancel any pending reveal from the first tap
+            const firstTapIdx = pendingReveal ? pendingReveal.idx : -1;
+            if (pendingReveal && pendingReveal.idx >= 0) {
+              // If the first tap revealed a tile, we need to undo it (toggle flag instead)
+              // But since we can't "unreveal", we'll just flag the tile
+              const firstIdx = pendingReveal.idx;
+              if (state.tiles[firstIdx].revealed && !state.tiles[firstIdx].flagged) {
+                // Tile was revealed by first tap - flag it instead
+                toggleFlag(firstIdx);
+              }
+            }
+            
             clearTimeout(doubleTapTimer);
             doubleTapTimer = null;
             lastTapTime = 0;
             lastTapPos = null;
+            pendingReveal = null;
             
             const fakeEvent = { clientX: touchStartPos.x, clientY: touchStartPos.y };
             const idx = pickTile(fakeEvent);
             if (idx >= 0 && !state.gameOver) {
-              toggleFlag(idx);
+              // If this is a different tile than the first tap, flag it
+              // (If it's the same tile, we already handled it above)
+              if (idx !== firstTapIdx) {
+                toggleFlag(idx);
+              }
               // Vibrate if supported
               if (navigator.vibrate) navigator.vibrate(30);
+              
+              // Mark that touch flagging occurred - block subsequent reveals
+              touchFlagHandled = true;
+              touchFlagTime = Date.now();
+              
+              // Clear flag after a short delay (only block immediate follow-up events)
+              setTimeout(() => {
+                touchFlagHandled = false;
+                touchFlagTime = 0;
+              }, 300); // Short timeout - only block immediate follow-up events
             }
           } else {
-            // Single tap - set up for potential double tap
-            lastTapPos = { x: touchStartPos.x, y: touchStartPos.y };
-            lastTapTime = currentTime;
-            
-            // Wait for potential second tap before revealing
-            doubleTapTimer = setTimeout(() => {
-              // Single tap confirmed - reveal
-              const fakeEvent = { clientX: lastTapPos.x, clientY: lastTapPos.y };
+            // Check if it's a simple tap (reveal) or something else (flag)
+            // If touch moved or was held too long, it's a flag gesture
+            // BUT only if it wasn't a rotation/drag gesture
+            if ((touchMoved || touchDuration > TAP_MAX_DURATION) && !wasDragging) {
+              // Movement or long hold = flag (but not if it was a rotation/drag)
+              const fakeEvent = { clientX: touchStartPos.x, clientY: touchStartPos.y };
               const idx = pickTile(fakeEvent);
               if (idx >= 0 && !state.gameOver) {
+                toggleFlag(idx);
+                // Vibrate if supported
+                if (navigator.vibrate) navigator.vibrate(50);
+                
+                // Mark that touch flagging occurred - block subsequent reveals
+                touchFlagHandled = true;
+                touchFlagTime = Date.now();
+                
+                // Clear any pending double-tap timer that might trigger a reveal
+                if (doubleTapTimer) {
+                  clearTimeout(doubleTapTimer);
+                  doubleTapTimer = null;
+                  lastTapTime = 0;
+                  lastTapPos = null;
+                }
+                
+                // Clear flag after a short delay (only block immediate follow-up events)
+                setTimeout(() => {
+                  touchFlagHandled = false;
+                  touchFlagTime = 0;
+                }, 300); // Short timeout - only block immediate follow-up events
+              }
+            } else if (!wasDragging) {
+              // Simple tap with no movement and short duration = reveal
+              // Reveal immediately for better responsiveness, but track for potential double-tap cancellation
+              lastTapPos = { x: touchStartPos.x, y: touchStartPos.y };
+              lastTapTime = currentTime;
+              
+              // Reveal immediately for better responsiveness
+              const fakeEvent = { clientX: touchStartPos.x, clientY: touchStartPos.y };
+              const idx = pickTile(fakeEvent);
+              
+              // CRITICAL: Block reveal if touch flagging just occurred
+              if (!touchFlagHandled && idx >= 0 && !state.gameOver) {
+                // Store pending reveal info to potentially cancel if double tap occurs
+                pendingReveal = { idx: idx, time: currentTime };
+                
+                // Reveal immediately
                 if (state.firstClick) {
                   placeMines(idx, debugConfig.mineRatio);
                   state.firstClick = false;
                 }
                 reveal(idx);
+                
+                // Set up timer to clear pending reveal after double-tap window
+                doubleTapTimer = setTimeout(() => {
+                  pendingReveal = null;
+                  lastTapTime = 0;
+                  lastTapPos = null;
+                  doubleTapTimer = null;
+                }, DOUBLE_TAP_DELAY);
+              } else {
+                // Clear state if reveal was blocked
+                lastTapTime = 0;
+                lastTapPos = null;
               }
-              lastTapTime = 0;
-              lastTapPos = null;
-              doubleTapTimer = null;
-            }, DOUBLE_TAP_DELAY);
+            }
           }
         }
         
