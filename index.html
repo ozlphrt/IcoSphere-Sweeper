@@ -1337,9 +1337,9 @@
 
       // Use setTimeout to allow UI to update
       setTimeout(() => {
-        // Try to generate a solvable board (max 3 attempts for faster loading)
+        // Try to generate a solvable board (max 10 attempts for better solvability)
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 10;
         let boardIsSolvable = false;
 
         const tryGenerateBoard = () => {
@@ -2345,21 +2345,19 @@
       return false;
     }
 
-    // Check if the current board state is solvable without guessing (optimized for speed)
+    // Check if the current board state is solvable without guessing (strict - requires 100% solvable)
     function isBoardSolvable(){
       // Create a snapshot of current state for solving simulation
       const revealed = new Set(state.tiles.map((t, i) => t.revealed ? i : -1).filter(i => i >= 0));
       const flagged = new Set(state.tiles.map((t, i) => t.flagged ? i : -1).filter(i => i >= 0));
       const totalSafe = state.tiles.filter(t => !t.mine && !t.isEmpty).length;
       
-      // Early exit: if we've revealed a good percentage, consider it solvable
-      const minSolvablePercent = 0.7; // If we can solve 70%+, consider it good enough
-      const minSolvable = Math.floor(totalSafe * minSolvablePercent);
+      // STRICT: Require 100% solvable - all safe tiles must be deducible
       
       // Simulate solving until we can't find more safe moves
       let foundNewSafe = true;
       let iterations = 0;
-      const maxIterations = 200; // Reduced from 2000 for faster checks
+      const maxIterations = 1000; // Increased for more thorough checking
       
       while (foundNewSafe && revealed.size < totalSafe && iterations < maxIterations) {
         iterations++;
@@ -2368,7 +2366,7 @@
         // First, cascade reveal all tiles with count 0 (they reveal all neighbors)
         let cascadeFound = true;
         let cascadeIterations = 0;
-        while (cascadeFound && cascadeIterations < 50) { // Limit cascade iterations
+        while (cascadeFound && cascadeIterations < 100) { // Increased limit for better cascading
           cascadeIterations++;
           cascadeFound = false;
           for (const tileIdx of revealed) {
@@ -2386,7 +2384,7 @@
           }
         }
         
-        // Check each revealed tile for basic deductions (fast path)
+        // Check each revealed tile for basic deductions
         for (const tileIdx of revealed) {
           const t = state.tiles[tileIdx];
           if (t.count === 0) continue;
@@ -2419,14 +2417,76 @@
           }
         }
         
-        // Early exit if we've reached a good solvable percentage
-        if (revealed.size >= minSolvable) {
-          return true;
+        // Advanced deduction: pattern matching between overlapping numbered tiles
+        // Check pairs of adjacent numbered tiles that share hidden neighbors
+        for (const tileIdx1 of revealed) {
+          const t1 = state.tiles[tileIdx1];
+          if (t1.count === 0) continue;
+          
+          const neighbors1 = state.neighbors[tileIdx1];
+          const hidden1 = new Set(neighbors1.filter(nb => !revealed.has(nb) && !flagged.has(nb) && !state.tiles[nb].isEmpty));
+          const flagged1 = neighbors1.filter(nb => flagged.has(nb)).length;
+          const remainingMines1 = t1.count - flagged1;
+          
+          if (remainingMines1 === 0 || hidden1.size === 0) continue;
+          
+          // Check all neighbors of this tile that are also revealed numbered tiles
+          for (const nbIdx of neighbors1) {
+            if (!revealed.has(nbIdx) || state.tiles[nbIdx].count === 0) continue;
+            
+            const t2 = state.tiles[nbIdx];
+            const neighbors2 = state.neighbors[nbIdx];
+            const hidden2 = new Set(neighbors2.filter(nb => !revealed.has(nb) && !flagged.has(nb) && !state.tiles[nb].isEmpty));
+            const flagged2 = neighbors2.filter(nb => flagged.has(nb)).length;
+            const remainingMines2 = t2.count - flagged2;
+            
+            if (remainingMines2 === 0 || hidden2.size === 0) continue;
+            
+            // Find shared and unique hidden neighbors
+            const shared = new Set([...hidden1].filter(x => hidden2.has(x)));
+            const unique1 = new Set([...hidden1].filter(x => !hidden2.has(x)));
+            const unique2 = new Set([...hidden2].filter(x => !hidden1.has(x)));
+            
+            // Pattern: If remainingMines1 - remainingMines2 == unique1.size and shared.size == remainingMines2
+            // Then all unique1 are mines, all unique2 are safe
+            if (remainingMines1 - remainingMines2 === unique1.size && shared.size === remainingMines2) {
+              // All unique1 tiles must be mines, all unique2 tiles must be safe
+              for (const nb of unique1) {
+                if (state.tiles[nb].mine && !flagged.has(nb)) {
+                  flagged.add(nb);
+                  foundNewSafe = true;
+                }
+              }
+              for (const nb of unique2) {
+                if (!state.tiles[nb].mine) {
+                  revealed.add(nb);
+                  foundNewSafe = true;
+                }
+              }
+            }
+            
+            // Reverse pattern: If remainingMines2 - remainingMines1 == unique2.size and shared.size == remainingMines1
+            if (remainingMines2 - remainingMines1 === unique2.size && shared.size === remainingMines1) {
+              // All unique2 tiles must be mines, all unique1 tiles must be safe
+              for (const nb of unique2) {
+                if (state.tiles[nb].mine && !flagged.has(nb)) {
+                  flagged.add(nb);
+                  foundNewSafe = true;
+                }
+              }
+              for (const nb of unique1) {
+                if (!state.tiles[nb].mine) {
+                  revealed.add(nb);
+                  foundNewSafe = true;
+                }
+              }
+            }
+          }
         }
       }
       
-      // Consider solvable if we've revealed a good percentage (optimistic approach)
-      return revealed.size >= minSolvable;
+      // STRICT: Only solvable if ALL safe tiles can be revealed (100% solvable)
+      return revealed.size === totalSafe;
     }
 
 
